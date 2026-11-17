@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# myrightmyride.com one-command installer and updater for an Ubuntu server (tested target: Hostinger VPS, Ubuntu 24.04,
-# with or without CloudPanel). Run it as root. Running it again later updates the website and keeps all data and settings.
+# myrightmyride.com one-command installer and updater for an Ubuntu server (target: Hostinger VPS, Ubuntu
+# 24.04 or 26.04, with or without CloudPanel). Run it as root. Running it again later updates the website and keeps all data and settings.
 #
 #   curl -fsSL https://raw.githubusercontent.com/fimbewa/myrightmyride.com/main/deploy/install.sh | bash
 #
@@ -26,13 +26,22 @@ export DEBIAN_FRONTEND=noninteractive
 
 say "1/7 Installing the basics (git, sqlite, build tools)"
 apt-get update -qq
-apt-get install -y -qq curl git sqlite3 ca-certificates build-essential dnsutils >/dev/null
+apt-get install -y -qq curl git sqlite3 ca-certificates build-essential xz-utils >/dev/null
 
 say "2/7 Installing Node.js 22"
-if ! /usr/bin/node -v 2>/dev/null | grep -qE '^v(2[2-9]|[3-9][0-9])\.'; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
-  apt-get install -y -qq nodejs >/dev/null
+node_ok() { /usr/bin/node -v 2>/dev/null | grep -qE '^v(2[0-9]|[3-9][0-9])\.'; }
+if ! node_ok; then   # try NodeSource, then Ubuntu's own package, then the official nodejs.org build
+  { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1 && apt-get install -y -qq nodejs >/dev/null 2>&1; } || true
 fi
+if ! node_ok; then apt-get install -y -qq nodejs npm >/dev/null 2>&1 || true; fi
+if ! node_ok; then
+  ARCH="$(uname -m)"; case "$ARCH" in x86_64) ARCH=x64;; aarch64) ARCH=arm64;; esac
+  NV="$(curl -fsSL https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt | grep -oE "node-v[0-9.]+-linux-$ARCH\.tar\.xz" | head -n1)"
+  [ -n "$NV" ] || die "Could not find a Node.js download for this server."
+  curl -fsSL "https://nodejs.org/dist/latest-v22.x/$NV" | tar -xJ -C /usr/local --strip-components=1
+  ln -sf /usr/local/bin/node /usr/bin/node; ln -sf /usr/local/bin/npm /usr/bin/npm
+fi
+node_ok || die "Node.js could not be installed."
 /usr/bin/node -v
 
 say "3/7 Downloading the website code"
@@ -100,9 +109,11 @@ echo "Website is running on port $PORT."
 
 say "6/7 Connecting $DOMAIN with HTTPS"
 SERVER_IP="$(curl -4 -fs https://api.ipify.org || hostname -I | awk '{print $1}')"
-DNS_IP="$(dig +short A "$DOMAIN" @1.1.1.1 | tail -n1)"
+ip_of() { { getent ahostsv4 "$1" 2>/dev/null || true; } | awk 'NR==1{print $1}'; }
+DNS_IP="$(ip_of "$DOMAIN")"
 DNS_OK=no; [ "$DNS_IP" = "$SERVER_IP" ] && DNS_OK=yes
-WWW_OK=no; [ "$(dig +short A "www.$DOMAIN" @1.1.1.1 | tail -n1)" = "$SERVER_IP" ] && WWW_OK=yes
+WWW_OK=no; [ "$(ip_of "www.$DOMAIN")" = "$SERVER_IP" ] && WWW_OK=yes
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null; fi
 HTTPS=no
 if command -v clpctl >/dev/null 2>&1; then
   echo "CloudPanel found: adding $DOMAIN as a Node.js site in CloudPanel."
@@ -124,19 +135,23 @@ else
     ss -ltnp | grep -E ':(80|443)\s' || true
     die "Another program (shown above) is already using the web ports 80/443. Stop it, or install CloudPanel, then run this again."
   fi
+  apt-get install -y -qq caddy >/dev/null 2>&1 || true   # Ubuntu's own package, if available
   if ! command -v caddy >/dev/null 2>&1; then
     apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https gpg >/dev/null
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
     apt-get update -qq && apt-get install -y -qq caddy >/dev/null
   fi
+  mkdir -p /etc/caddy
   cat > /etc/caddy/Caddyfile <<CADDY
 $DOMAIN, www.$DOMAIN {
   encode gzip
   reverse_proxy 127.0.0.1:$PORT
 }
 CADDY
-  systemctl reload caddy || systemctl restart caddy
+  mkdir -p /etc/caddy
+  systemctl enable -q caddy 2>/dev/null || true
+  systemctl restart caddy || { journalctl -u caddy -n 20 --no-pager; die "The HTTPS service (Caddy) did not start. The lines above show why."; }
   [ "$DNS_OK" = yes ] && HTTPS=yes
 fi
 
@@ -163,7 +178,8 @@ else
   echo " Wait, then run the SAME install command again. It will switch on HTTPS."
 fi
 echo
-[ -f "$PW_FILE" ] && { echo " Your owner panel password (also saved in $PW_FILE):"; grep '^Password' "$PW_FILE"; }
+echo " Your owner panel password:  $(grep -E '^ADMIN_PASSWORD=' "$APP_DIR/.env" | cut -d= -f2-)"
+echo " (To see it again later, run:  grep ADMIN_PASSWORD $APP_DIR/.env )"
 echo
 echo " TEST MODE is on: login OTPs are shown on screen, no SMS is sent."
 echo " Backups: $BACKUP_DIR (daily, last 30 days kept)"
