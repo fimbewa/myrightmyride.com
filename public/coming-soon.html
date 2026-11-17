@@ -26,15 +26,17 @@
     <p class="lead">Book a bike, auto or car from anywhere, with <b>no commission</b> from drivers or passengers.</p>
     <div class="vehs"><span>Bike</span><span>Auto</span><span>Car</span></div>
     <div class="free">Pay the driver directly, as per the vehicle's own meter, by cash, UPI or card. The site never takes a fee.</div>
-    <p class="note"><b>Disclaimer:</b> <span id="disc">myrightmyride.com is a citizens' initiative operated by Maykra Technologies OPC Ltd. It is not approved by, or connected with, any government body.</span></p>
-    <p class="note" id="op">Operated by Maykra Technologies OPC Ltd</p>
+    <p class="note"><b>Disclaimer:</b> <span id="disc">myrightmyride.com is a citizens' initiative operated by MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED. It is not approved by, or connected with, any government body.</span></p>
+    <p class="note" id="op">Operated by MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED · CIN U62010MR2026OPC477927 · Registered office: Plot No. 964/1, Durga Mata Mandir, Subhash Nagar, Dhule City, Dhule 424001, Maharashtra</p>
   </section>
 </main>
 <script>
   // Use the owner's current wording from the owner panel.
   fetch("/api/config").then(r => r.json()).then(c => {
     if (c.governmentDisclaimer) document.getElementById("disc").textContent = c.governmentDisclaimer;
-    document.getElementById("op").textContent = c.operatorName ? "Operated by " + c.operatorName + (c.operatorCin ? " · CIN " + c.operatorCin : "") : "";
+    document.getElementById("op").textContent = [c.operatorName && "Operated by " + c.operatorName, c.operatorCin && "CIN " + c.operatorCin,
+      c.operatorAddress && "Registered office: " + c.operatorAddress, c.contactEmail && "Email: " + c.contactEmail,
+      c.contactPhone && "Phone: " + c.contactPhone].filter(Boolean).join(" · ");
   }).catch(() => {});
 </script>
 </body>

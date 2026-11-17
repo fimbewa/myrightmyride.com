@@ -131,8 +131,11 @@
 
   // ---------- website texts ----------
   const TEXTS = [
-    ["operatorName", "Company that operates the website (e.g. Maykra Technologies (OPC) Private Limited)", false],
-    ["operatorCin", "Company CIN (leave empty until you have it)", false],
+    ["operatorName", "Company that operates the website", false],
+    ["operatorCin", "Company CIN", false],
+    ["operatorAddress", "Registered office address", false],
+    ["contactEmail", "Contact email shown in the footer", false],
+    ["contactPhone", "Contact phone shown in the footer", false],
     ["siteName", "Website name", false], ["tagline", "Tagline under the name", false],
     ["noCommissionText", "No-commission and payment text (footer)", true],
     ["governmentDisclaimer", "Disclaimer: citizens' initiative, not government approved ({operator} is replaced by the company name)", true],

@@ -8,8 +8,11 @@ const DEFAULTS = {
   noCommissionText:
     "myrightmyride.com takes no commission from drivers or passengers. The final fare is what the vehicle's own meter shows, or the fare the passenger decides at booking, and you pay the driver directly by cash, UPI (GPay, PhonePe, Paytm or any UPI app) or card after the ride. Payments are free: the site never takes a fee or handles your money.",
   // The company that runs the website. Shown in the footer and the disclaimer; {operator} in any text is replaced by it.
-  operatorName: "Maykra Technologies OPC Ltd",
-  operatorCin: "", // Corporate Identification Number from MCA; shown in the footer once filled in
+  operatorName: "MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED",
+  operatorCin: "U62010MR2026OPC477927", // Corporate Identification Number (certificate of incorporation)
+  operatorAddress: "Plot No. 964/1, Durga Mata Mandir, Subhash Nagar, Dhule City, Dhule 424001, Maharashtra",
+  contactEmail: "", // shown in the footer once filled in (Companies Act s.12(3)(c), e-commerce rules)
+  contactPhone: "",
   governmentDisclaimer:
     "myrightmyride.com is a citizens' initiative operated by {operator}. It is not approved by, or connected with, any government body.",
   safetyText:
