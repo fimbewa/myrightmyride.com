@@ -24,51 +24,25 @@ You need:
 2. **Your domain** `myrightmyride.com`. At your domain company, add an "A record" for `myrightmyride.com` and `www` pointing to your server's IP address.
 3. **An SMS company account** for login OTPs (MSG91, Fast2SMS, Textlocal or any other). You need DLT registration for your OTP message. SMS is the only thing that costs money per use, and it is charged by the SMS company, not by any platform.
 
-Then log in to the server and run these commands (anyone who knows basic Linux can do this for you):
+Then open your server's terminal (Hostinger: **VPS → Terminal** in hPanel) and paste this one command:
 
 ```bash
-# 1. Install Node.js 22, git and Caddy (Caddy gives free HTTPS automatically)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs git caddy build-essential
-
-# 2. Get the website
-git clone https://github.com/fimbewa/myrightmyride.com.git
-cd myrightmyride.com
-npm ci --omit=dev
-
-# 3. Settings: copy the example and fill in your admin password and SMS details
-cp .env.example .env
-nano .env
-
-# 4. Keep it running for ever (restarts by itself after a crash or reboot)
-sudo npm install -g pm2
-pm2 start server/index.js --name myrightmyride
-pm2 save && pm2 startup
-
-# 5. HTTPS for your domain
-echo 'myrightmyride.com, www.myrightmyride.com {
-  reverse_proxy localhost:3000
-}' | sudo tee /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+curl -fsSL https://raw.githubusercontent.com/fimbewa/myrightmyride.com/main/deploy/install.sh | bash
 ```
 
-Open https://myrightmyride.com, and the owner panel at https://myrightmyride.com/admin.
+It installs Node.js, downloads the website, creates the settings file with a random owner password, starts the website as a service, connects the domain with free HTTPS (through CloudPanel if it is installed, otherwise Caddy), and sets up a daily backup. At the end it prints your owner panel password (also saved in `/root/myrightmyride-admin-password.txt`).
+
+The site starts in **test mode**: no SMS is sent and the login OTP is shown on screen. When your SMS company is ready, edit `/opt/myrightmyride/.env` (set `SMS_PROVIDER=http`, `SMS_HTTP_URL=...`, `SHOW_OTP_ON_SCREEN=false`) and run `systemctl restart myrightmyride`.
 
 ### Getting future changes
 
-When new code is added to this GitHub repository, update the server with:
+Run the same install command again. It updates the code and keeps all data, settings and the password.
 
-```bash
-cd myrightmyride.com && git pull && npm ci --omit=dev && pm2 restart myrightmyride
-```
+Useful commands: `systemctl status myrightmyride` (is it running?), `journalctl -u myrightmyride -n 50` (recent log).
 
 ### Backups
 
-All users, drivers, rides and settings are in one file, `data/myrightmyride.db`. Copy it somewhere safe every day, for example:
-
-```bash
-sqlite3 data/myrightmyride.db ".backup 'backup-$(date +%F).db'"
-```
+All users, drivers, rides and settings are in one file, `/opt/myrightmyride/data/myrightmyride.db`. The installer copies it every night to `/var/backups/myrightmyride/` and keeps 30 days. Also download a copy to your own computer now and then, or turn on Hostinger's weekly VPS backups.
 
 ## Day-to-day use (no coding)
 
