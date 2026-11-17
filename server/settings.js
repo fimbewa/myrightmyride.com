@@ -29,6 +29,8 @@ const DEFAULTS = {
     { key: "plus", name: "Plus ride cover", details: "Accident cover plus theft of belongings. Details coming soon.", price: null, active: true },
   ],
   insuranceNote: "Plans, prices and cover amounts are being finalised with licensed partner insurers. No payment is taken here.",
+  // While true, visitors see the "Coming soon" page and cannot log in or book. The owner can still preview the site.
+  comingSoon: true,
   allowPassengerFare: true,
   requireDriverApproval: true,
   // Map services. Defaults are the free public OpenStreetMap services, fine for testing.

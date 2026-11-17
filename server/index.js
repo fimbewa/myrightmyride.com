@@ -22,8 +22,24 @@ app.use((req, res, next) => {
   res.set("Referrer-Policy", "strict-origin-when-cross-origin"); // map and search services need to see which site is asking
   next();
 });
-app.use(express.static(path.join(__dirname, "..", "public"), { extensions: ["html"] }));
 app.get("/tiles/:z/:x/:y", require("./tiles").handler);
+
+// "Coming soon" mode (switched in the owner panel). Visitors get the coming-soon page and the public API is closed;
+// the owner, after logging in to /admin in the same browser, can still use and preview the real site.
+function isOwner(req) {
+  const m = /(?:^|;\s*)mrmr_owner=([a-f0-9]{48})/.exec(req.get("cookie") || "");
+  return !!(m && db.prepare("SELECT 1 FROM admin_sessions WHERE token = ?").get(m[1]));
+}
+app.use((req, res, next) => {
+  if (!settings.get("comingSoon")) return next();
+  const p = req.path;
+  if (p.startsWith("/api/admin") || p === "/api/config" || p.startsWith("/admin") || p.startsWith("/js/admin") || p.startsWith("/css/") || p === "/coming-soon.html") return next();
+  if (isOwner(req)) return next();
+  if (p === "/" || p === "/index.html" || p === "/index") return res.set("Cache-Control", "no-store").sendFile(path.join(__dirname, "..", "public", "coming-soon.html"));
+  if (p.startsWith("/api/")) return bad(res, "myrightmyride.com is coming soon. Bookings are not open yet.", 503);
+  next();
+});
+app.use(express.static(path.join(__dirname, "..", "public"), { extensions: ["html"] }));
 app.use("/vendor/leaflet", express.static(path.join(__dirname, "..", "node_modules", "leaflet", "dist")));
 
 // ---------- helpers ----------

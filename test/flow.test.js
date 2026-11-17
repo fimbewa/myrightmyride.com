@@ -28,6 +28,18 @@ async function login(phone, name) {
   return v.data.token;
 }
 
+test("coming soon mode: closed to the public, owner can preview", async () => {
+  const home = await fetch(base + "/");
+  assert.match(await home.text(), /Coming soon/);
+  assert.equal((await call("POST", "/api/auth/request-otp", { phone: "9876543210" })).status, 503);
+  assert.equal((await fetch(base + "/admin")).status, 200);
+  const aT = (await call("POST", "/api/admin/login", { password: "testpass123" })).data.token;
+  const owner = await fetch(base + "/", { headers: { cookie: "mrmr_owner=" + aT } });
+  assert.doesNotMatch(await owner.text(), /<h1>Coming soon/);
+  assert.equal((await call("PUT", "/api/admin/settings", { comingSoon: false }, aT)).status, 200);
+  assert.doesNotMatch(await (await fetch(base + "/")).text(), /<h1>Coming soon/);
+});
+
 test("full ride flow", async () => {
   const cfg = await call("GET", "/api/config");
   assert.equal(cfg.status, 200);

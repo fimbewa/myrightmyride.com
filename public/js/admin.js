@@ -15,12 +15,21 @@
     if (!res.ok) throw new Error(data.error || "Something went wrong.");
     return data;
   }
-  function setToken(t) { token = t; try { t ? localStorage.setItem("mrmr-admin", t) : localStorage.removeItem("mrmr-admin"); } catch {} }
+  function setToken(t) {
+    token = t;
+    try { t ? localStorage.setItem("mrmr-admin", t) : localStorage.removeItem("mrmr-admin"); } catch {}
+    ownerCookie();
+  }
+  // Lets the owner see the real website in this browser while the "Coming soon" page is on.
+  function ownerCookie() {
+    const sec = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = token ? `mrmr_owner=${token}; path=/; max-age=604800; SameSite=Lax${sec}` : "mrmr_owner=; path=/; max-age=0";
+  }
 
   function show() {
     const inn = !!token;
     $("loginCard").hidden = inn; $("tabs").hidden = !inn; $("view").hidden = !inn; $("logout").hidden = !inn;
-    if (inn) load();
+    if (inn) { ownerCookie(); load(); }
   }
   $("loginForm").onsubmit = async e => {
     e.preventDefault(); $("loginErr").textContent = "";
@@ -46,12 +55,23 @@
 
   // ---------- overview ----------
   async function overview() {
-    const o = await api("/api/admin/overview");
+    const [o, st] = await Promise.all([api("/api/admin/overview"), api("/api/admin/settings")]);
     const s = [["Users", o.users], ["Logged in", o.loggedIn], ["Active in last 5 min", o.activeNow], ["Drivers", o.drivers],
       ["Drivers waiting for approval", o.driversPending], ["Drivers online", o.driversOnline], ["Rides in last 24 h", o.ridesToday],
       ["Rides in progress", o.ridesOpen], ["Insured rides, 24 h", o.insuredToday], ["Places waiting for approval", o.placesPending]];
-    V().innerHTML = `<h2>Overview</h2><div class="stats">${s.map(([k, v]) => `<div class="stat"><span class="note">${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>
+    V().innerHTML = `<div class="box ${st.comingSoon ? "" : "hl"}">
+        <div class="row between"><h2>${st.comingSoon ? "🚧 Website shows “Coming soon”" : "✅ Website is open to the public"}</h2></div>
+        <p class="note">${st.comingSoon ? "Visitors see only the Coming soon page and cannot log in or book. You can still use the real website in this browser while you are logged in here."
+          : "Anyone can log in, book rides and register as a driver."}</p>
+        <div class="row"><button class="btn ${st.comingSoon ? "" : "sec"}" id="csToggle">${st.comingSoon ? "Open the website to the public" : "Show Coming soon page again"}</button>
+          <a class="btn sec" href="/" target="_blank" rel="noopener">Preview the website</a></div></div>
+      <h2>Overview</h2><div class="stats">${s.map(([k, v]) => `<div class="stat"><span class="note">${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>
       <p class="note">Changes you make in this panel show on the website straight away. Nobody takes a commission or fee.</p>`;
+    $("csToggle").onclick = async () => {
+      const open = st.comingSoon;
+      if (open && !confirm("Open myrightmyride.com to the public now? Anyone will be able to log in and book rides.")) return;
+      await api("/api/admin/settings", { method: "PUT", body: { comingSoon: !open } }); load();
+    };
   }
 
   // ---------- users ----------
