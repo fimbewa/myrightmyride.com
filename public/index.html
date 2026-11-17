@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#15302c">
+<title>myrightmyride.com · Zero-commission rides</title>
+<meta name="description" content="Book a bike, auto or car from anywhere. No commission from drivers or passengers. Pay the driver directly as per meter. A citizens' initiative.">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">myrightmyride<span>.com</span></div>
+      <div class="tag" id="tagline"></div>
+    </div>
+    <div class="seg" id="roleSeg" role="group" aria-label="I am a" hidden>
+      <button id="roleP" aria-pressed="true">Passenger</button>
+      <button id="roleD" aria-pressed="false">Driver</button>
+    </div>
+  </header>
+  <div id="who" class="who" hidden></div>
+  <div id="banner" class="banner" hidden></div>
+
+  <section id="loginView" class="card" hidden></section>
+
+  <section class="card mapcard" id="mapCard">
+    <div class="maphead"><span id="mapHint">Map data © OpenStreetMap contributors</span><button class="btn sec small" id="locateMe" type="button">📍 My location</button></div>
+    <div id="map"></div>
+  </section>
+
+  <section id="pView" class="card" hidden></section>
+  <section id="dView" class="card" hidden></section>
+  <section id="tlView" class="card" hidden></section>
+
+  <footer class="foot">
+    <div class="free" id="noCommission"></div>
+    <p class="note"><b>Disclaimer:</b> <span id="govDisclaimer"></span></p>
+    <p class="note"><b>Passenger safety:</b> <span id="safetyText"></span></p>
+    <p class="note"><a href="/admin">Owner login</a></p>
+  </footer>
+</div>
+<div id="sheet" class="sheet" hidden></div>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/data/places-maharashtra.js"></script>
+<script src="/js/places.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
