@@ -33,7 +33,7 @@ const DEFAULTS = {
   requireDriverApproval: true,
   // Map services. Defaults are the free public OpenStreetMap services, fine for testing.
   // For real traffic, run your own copies on your server and put their addresses here.
-  tileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  tileUrl: "/tiles/{z}/{x}/{y}.png", // served and cached by our own server (see server/tiles.js)
   tileAttribution: "© OpenStreetMap contributors",
   searchUrl: "https://photon.komoot.io",
   overpassUrl: "https://overpass-api.de/api/interpreter",
@@ -48,6 +48,8 @@ function getAll() {
       try { out[row.key] = JSON.parse(row.value); } catch { /* keep default */ }
     }
   }
+  // Older installs saved OpenStreetMap's address directly; switch them to our own cached tiles.
+  if (out.tileUrl === "https://tile.openstreetmap.org/{z}/{x}/{y}.png") out.tileUrl = DEFAULTS.tileUrl;
   return out;
 }
 

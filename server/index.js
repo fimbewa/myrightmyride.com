@@ -19,10 +19,11 @@ app.set("trust proxy", 1);
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
-  res.set("Referrer-Policy", "same-origin");
+  res.set("Referrer-Policy", "strict-origin-when-cross-origin"); // map and search services need to see which site is asking
   next();
 });
 app.use(express.static(path.join(__dirname, "..", "public"), { extensions: ["html"] }));
+app.get("/tiles/:z/:x/:y", require("./tiles").handler);
 app.use("/vendor/leaflet", express.static(path.join(__dirname, "..", "node_modules", "leaflet", "dist")));
 
 // ---------- helpers ----------
