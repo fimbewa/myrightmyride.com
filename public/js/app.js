@@ -373,7 +373,8 @@
   function fitActive() { const r = activeRide(); if (r) fit([r.pickup, r.drop, r.driverPos]); }
   function render() {
     const c = S.cfg, out = !S.me;
-    $("tagline").textContent = c.tagline; $("noCommission").textContent = c.noCommissionText; $("govDisclaimer").textContent = c.governmentDisclaimer; $("safetyText").textContent = c.safetyText;
+    $("tagline").textContent = c.tagline; $("noCommission").textContent = c.noCommissionText; $("govDisclaimer").textContent = c.governmentDisclaimer;
+    $("operatorLine").textContent = c.operatorName ? `Operated by ${c.operatorName}${c.operatorCin ? ` · CIN ${c.operatorCin}` : ""}` : ""; $("safetyText").textContent = c.safetyText;
     $("loginView").hidden = !out; $("roleSeg").hidden = out; $("who").hidden = out;
     if (out) { $("pView").hidden = $("dView").hidden = $("tlView").hidden = true; renderLogin(); drawMap(); return; }
     $("who").innerHTML = `<span>Logged in as <b>${esc(S.me.name)}</b> · ${esc(S.me.phone)}</span><button class="btn sec small" id="logout" type="button">Log out</button>`;

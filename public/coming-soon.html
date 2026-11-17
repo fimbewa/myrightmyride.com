@@ -26,8 +26,16 @@
     <p class="lead">Book a bike, auto or car from anywhere, with <b>no commission</b> from drivers or passengers.</p>
     <div class="vehs"><span>Bike</span><span>Auto</span><span>Car</span></div>
     <div class="free">Pay the driver directly, as per the vehicle's own meter, by cash, UPI or card. The site never takes a fee.</div>
-    <p class="note"><b>Disclaimer:</b> myrightmyride.com is a citizens' initiative. It is not approved by, or connected with, any government body.</p>
+    <p class="note"><b>Disclaimer:</b> <span id="disc">myrightmyride.com is a citizens' initiative operated by Maykra Technologies OPC Ltd. It is not approved by, or connected with, any government body.</span></p>
+    <p class="note" id="op">Operated by Maykra Technologies OPC Ltd</p>
   </section>
 </main>
+<script>
+  // Use the owner's current wording from the owner panel.
+  fetch("/api/config").then(r => r.json()).then(c => {
+    if (c.governmentDisclaimer) document.getElementById("disc").textContent = c.governmentDisclaimer;
+    document.getElementById("op").textContent = c.operatorName ? "Operated by " + c.operatorName + (c.operatorCin ? " · CIN " + c.operatorCin : "") : "";
+  }).catch(() => {});
+</script>
 </body>
 </html>

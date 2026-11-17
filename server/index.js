@@ -109,6 +109,7 @@ function pushRide(id) {
 // ---------- public config ----------
 app.get("/api/config", (req, res) => {
   const s = settings.getAll();
+  for (const k of Object.keys(s)) if (typeof s[k] === "string" && k !== "operatorName") s[k] = s[k].replaceAll("{operator}", s.operatorName || "");
   res.json({
     ...s,
     vehicles: s.vehicles.filter(v => v.active),

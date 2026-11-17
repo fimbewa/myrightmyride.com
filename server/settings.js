@@ -7,8 +7,11 @@ const DEFAULTS = {
   tagline: "Bike · Auto · Car. No commission from drivers or passengers.",
   noCommissionText:
     "myrightmyride.com takes no commission from drivers or passengers. The final fare is what the vehicle's own meter shows, or the fare the passenger decides at booking, and you pay the driver directly by cash, UPI (GPay, PhonePe, Paytm or any UPI app) or card after the ride. Payments are free: the site never takes a fee or handles your money.",
+  // The company that runs the website. Shown in the footer and the disclaimer; {operator} in any text is replaced by it.
+  operatorName: "Maykra Technologies OPC Ltd",
+  operatorCin: "", // Corporate Identification Number from MCA; shown in the footer once filled in
   governmentDisclaimer:
-    "myrightmyride.com is a citizens' initiative. It is not approved by, or connected with, any government body.",
+    "myrightmyride.com is a citizens' initiative operated by {operator}. It is not approved by, or connected with, any government body.",
   safetyText:
     "Your safety is your own responsibility. Before choosing a ride, take care to protect yourself against theft, injury or other harm. We recommend insuring every ride, either with the optional ride cover offered at booking by our partner insurers or with your own accident and personal insurance. myrightmyride.com only connects passengers and drivers.",
   safetyCheckbox:
@@ -51,6 +54,8 @@ function getAll() {
     }
   }
   // Older installs saved OpenStreetMap's address directly; switch them to our own cached tiles.
+  // Older installs saved the disclaimer without the operator; add it.
+  if (out.governmentDisclaimer === "myrightmyride.com is a citizens' initiative. It is not approved by, or connected with, any government body.") out.governmentDisclaimer = DEFAULTS.governmentDisclaimer;
   if (out.tileUrl === "https://tile.openstreetmap.org/{z}/{x}/{y}.png") out.tileUrl = DEFAULTS.tileUrl;
   return out;
 }
