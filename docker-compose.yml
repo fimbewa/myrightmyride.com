@@ -1,0 +1,53 @@
+# myrightmyride.com with Docker: the website plus automatic free HTTPS (Caddy).
+# Hostinger: hPanel > VPS > Docker Manager > Compose > paste this file (or give this GitHub repository's address), then Deploy.
+# Nothing to edit. The owner panel password is created on first start and shown in the "app" container's logs.
+services:
+  app:
+    image: node:22-bookworm
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      DB_FILE: /data/myrightmyride.db
+      SMS_PROVIDER: console        # test mode: no SMS is sent
+      SHOW_OTP_ON_SCREEN: "true"   # test mode: the login OTP is shown on screen
+      REPO: https://github.com/fimbewa/myrightmyride.com.git
+      # ADMIN_PASSWORD: "your-own-password"   # optional; otherwise one is created for you
+    volumes:
+      - app_data:/data
+      - app_code:/srv
+    command:
+      - bash
+      - -c
+      - |
+        if [ -d /srv/app/.git ]; then
+          git -C /srv/app pull -q --ff-only || echo "Could not download updates; using the copy already here."
+        else
+          git clone -q --depth 1 "$$REPO" /srv/app || { echo "Could not download the code. Is the GitHub repository public?"; sleep 60; exit 1; }
+        fi
+        cd /srv/app && npm ci --omit=dev --no-audit --no-fund --loglevel=error && exec bash deploy/docker-run.sh
+
+  web:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: myrightmyride.com
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    command:
+      - sh
+      - -c
+      - |
+        printf '%s, www.%s {\n\tencode gzip\n\treverse_proxy app:3000\n}\n' "$$DOMAIN" "$$DOMAIN" > /etc/caddy/Caddyfile
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+
+volumes:
+  app_data:
+  app_code:
+  caddy_data:
+  caddy_config:

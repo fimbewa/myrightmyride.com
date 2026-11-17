@@ -34,6 +34,10 @@ It installs Node.js, downloads the website, creates the settings file with a ran
 
 The site starts in **test mode**: no SMS is sent and the login OTP is shown on screen. When your SMS company is ready, edit `/opt/myrightmyride/.env` (set `SMS_PROVIDER=http`, `SMS_HTTP_URL=...`, `SHOW_OTP_ON_SCREEN=false`) and run `systemctl restart myrightmyride`.
 
+### Or: with Docker, no terminal needed (Hostinger Docker Manager)
+
+In hPanel go to **VPS → Docker Manager → Compose**, choose to create a project from a URL and give `https://github.com/fimbewa/myrightmyride.com` (or paste the contents of `docker-compose.yml`), name it `myrightmyride`, and press **Deploy**. It runs the website and Caddy (free HTTPS for myrightmyride.com and www). The owner panel password is created on first start: open the project, then the **app** container's **Logs**, and look for `OWNER PANEL PASSWORD`. Data and daily backups are kept in the `app_data` volume. To update, press **Restart** or **Redeploy** on the project; it downloads the latest code (the repository must be public for this). Use either Docker or the install command, not both.
+
 ### Getting future changes
 
 Run the same install command again. It updates the code and keeps all data, settings and the password.
