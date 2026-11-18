@@ -7,6 +7,7 @@
   const INDIA_BBOX = "68,6,98,37";
   let CFG = { searchUrl: "https://photon.komoot.io", overpassUrl: "https://overpass-api.de/api/interpreter" };
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const t = (x, v) => (window.I18N ? I18N.t(x, v) : x);
   const BUILTIN = (window.BUILTIN_PLACES || []).flatMap(g => g.s.map(n => ({ name: n, group: g.g })));
 
   async function photon(q, extra = "") {
@@ -34,6 +35,17 @@
     return res[0] ? { label: `${item.name} (${item.group})`, lat: res[0].lat, lng: res[0].lng } : null;
   }
 
+  // Exact position of a railway station: look it up on OpenStreetMap near the approximate position, else keep the approximation.
+  async function findStation(name, lat, lng) {
+    const q = name.replace(/\s*\(.*?\)\s*/g, " ").replace(/\b(Junction|Terminus|Jn)\b/gi, "").trim();
+    try {
+      const res = await photon(q + " railway station", `&osm_tag=railway:station&lat=${lat}&lon=${lng}`);
+      const near = res.find(r => Math.hypot(r.lat - lat, (r.lng - lng) * Math.cos(lat * Math.PI / 180)) < 0.05); // within about 5 km
+      if (near) return { lat: near.lat, lng: near.lng, exact: true };
+    } catch { /* keep the approximate position */ }
+    return { lat, lng, exact: false };
+  }
+
   // Typed search box with suggestions. onPick({label, lat, lng})
   function attachSearch(input, onPick, onStatus = () => {}) {
     const wrap = input.closest(".field");
@@ -49,14 +61,14 @@
         let mine = [];
         try { mine = await (await fetch("/api/places?q=" + encodeURIComponent(q))).json(); } catch { /* ignore */ }
         let found = [];
-        try { found = await photon(q); } catch { onStatus("Search could not reach the map service. Check your internet connection."); }
+        try { found = await photon(q); } catch { onStatus(t("Search could not reach the map service. Check your internet connection.")); }
         if (my !== seq) return;
         box.innerHTML = "";
         const add = (title, sub, pick) => {
           const b = document.createElement("button"); b.type = "button";
           b.innerHTML = `<b>${esc(title)}</b><br><small>${esc(sub)}</small>`;
           b.addEventListener("mousedown", e => e.preventDefault());
-          b.onclick = async () => { box.hidden = true; const p = await pick(); if (p) { input.value = p.label; onPick(p); } else onStatus("Couldn't find that place on the map. Try typing it differently."); };
+          b.onclick = async () => { box.hidden = true; const p = await pick(); if (p) { input.value = p.label; onPick(p); } else onStatus(t("Couldn't find that place on the map. Try typing it differently.")); };
           box.appendChild(b);
         };
         for (const p of mine.slice(0, 5)) add(p.name, [p.category, p.district, p.state].filter(Boolean).join(" · "), async () => ({ label: p.name + (p.district ? ", " + p.district : ""), lat: p.lat, lng: p.lng }));
@@ -98,17 +110,17 @@
   function openListPicker(onPick, onClose) {
     const sheet = document.getElementById("sheet");
     sheet.hidden = false;
-    sheet.innerHTML = `<div class="card" role="dialog" aria-label="Choose a place from the list">
-      <div class="row between"><h2>Choose from list</h2><button class="btn sec small" id="lpClose" type="button">Close</button></div>
+    sheet.innerHTML = `<div class="card" role="dialog" aria-label="${t("Choose from list")}">
+      <div class="row between"><h2>${t("Choose from list")}</h2><button class="btn sec small" id="lpClose" type="button">${t("Close")}</button></div>
       <div class="grid2">
-        <label for="lpState">State<select id="lpState"><option value="">Choose state</option>${STATES.map(s => `<option>${esc(s)}</option>`).join("")}</select></label>
-        <label for="lpDist">District<select id="lpDist" disabled><option value="">Choose district</option></select></label>
-        <label for="lpTal">Taluka<select id="lpTal" disabled><option value="">Whole district</option></select></label>
-        <label for="lpCat">Kind of place<select id="lpCat">${Object.entries(CATS).map(([k, c]) => `<option value="${k}">${esc(c.n)}</option>`).join("")}</select></label>
+        <label for="lpState">${t("State")}<select id="lpState"><option value="">${t("Choose state")}</option>${STATES.map(s => `<option>${esc(s)}</option>`).join("")}</select></label>
+        <label for="lpDist">${t("District")}<select id="lpDist" disabled><option value="">${t("Choose district")}</option></select></label>
+        <label for="lpTal">${t("Taluka")}<select id="lpTal" disabled><option value="">${t("Whole district")}</option></select></label>
+        <label for="lpCat">${t("Kind of place")}<select id="lpCat">${Object.entries(CATS).map(([k, c]) => `<option value="${k}">${esc(t(c.n))}</option>`).join("")}</select></label>
       </div>
-      <button class="btn" id="lpLoad" type="button">Show places</button>
+      <button class="btn" id="lpLoad" type="button">${t("Show places")}</button>
       <p class="note" id="lpStatus"></p>
-      <input id="lpFilter" placeholder="Filter by name…" hidden>
+      <input id="lpFilter" placeholder="${t("Filter by name…")}" hidden>
       <div class="list" id="lpList"></div>
     </div>`;
     const $ = id => document.getElementById(id), st = t => ($("lpStatus").textContent = t);
@@ -121,26 +133,26 @@
       return j.elements.map(e => ({ area: 3600000000 + e.id, n: enName(e.tags) })).filter(x => x.n).sort((a, b) => a.n.localeCompare(b.n));
     }
     $("lpState").onchange = async e => {
-      fill($("lpDist"), [], "Choose district"); fill($("lpTal"), [], "Whole district");
+      fill($("lpDist"), [], t("Choose district")); fill($("lpTal"), [], t("Whole district"));
       if (!e.target.value) return;
-      st("Loading districts…");
+      st(t("Loading districts…"));
       try {
         const n = e.target.value;
         const j = await overpass(`[out:json][timeout:30];(rel["boundary"="administrative"]["admin_level"="4"]["name:en"="${n}"];rel["boundary"="administrative"]["admin_level"="4"]["name"="${n}"];);out ids;`);
         if (!j.elements[0]) throw 0;
-        fill($("lpDist"), await areas(3600000000 + j.elements[0].id, 5), "Choose district"); st("");
-      } catch { st("Could not load districts right now. Please try again in a minute."); }
+        fill($("lpDist"), await areas(3600000000 + j.elements[0].id, 5), t("Choose district")); st("");
+      } catch { st(t("Could not load districts right now. Please try again in a minute.")); }
     };
     $("lpDist").onchange = async e => {
-      fill($("lpTal"), [], "Whole district"); if (!e.target.value) return;
-      st("Loading talukas…");
-      try { fill($("lpTal"), await areas(e.target.value, 6), "Whole district"); st(""); } catch { st("Could not load talukas. You can still search the whole district."); }
+      fill($("lpTal"), [], t("Whole district")); if (!e.target.value) return;
+      st(t("Loading talukas…"));
+      try { fill($("lpTal"), await areas(e.target.value, 6), t("Whole district")); st(""); } catch { st(t("Could not load talukas. You can still search the whole district.")); }
     };
     let items = [];
     const draw = () => {
       const f = $("lpFilter").value.trim().toLowerCase(), box = $("lpList");
       const shown = items.filter(x => !f || x.name.toLowerCase().includes(f)).slice(0, 300);
-      box.innerHTML = shown.length ? "" : `<p class="note">Nothing found. Places not yet on OpenStreetMap won't appear. You can suggest a missing place from the booking screen.</p>`;
+      box.innerHTML = shown.length ? "" : `<p class="note">${t("Nothing found. Places not yet on OpenStreetMap won't appear. You can suggest a missing place from the booking screen.")}</p>`;
       for (const x of shown) {
         const b = document.createElement("button"); b.type = "button"; b.className = "tl-item";
         b.innerHTML = `<b>${esc(x.name)}</b><span class="note">${esc(x.sub)}</span>`;
@@ -151,32 +163,32 @@
     $("lpFilter").oninput = draw;
     $("lpLoad").onclick = async () => {
       const area = $("lpTal").value || $("lpDist").value, catKey = $("lpCat").value, cat = CATS[catKey];
-      if (!area) { st("Choose a state and a district first."); return; }
+      if (!area) { st(t("Choose a state and a district first.")); return; }
       const where = [$("lpTal").value ? $("lpTal").selectedOptions[0].textContent : "", $("lpDist").selectedOptions[0].textContent].filter(Boolean).join(", ");
-      st("Loading " + cat.n.toLowerCase() + "…");
+      st(t("Loading…"));
       try {
         const [j, mine] = await Promise.all([
           overpass(`[out:json][timeout:60];area(${area})->.a;(${cat.q.map(x => x + "(area.a);").join("")});out center 2000;`),
           fetch(`/api/places?state=${encodeURIComponent($("lpState").value)}&district=${encodeURIComponent($("lpDist").selectedOptions[0].textContent)}&category=${catKey}`).then(r => r.json()).catch(() => []),
         ]);
         const seen = new Set();
-        items = mine.map(p => ({ name: p.name, lat: p.lat, lng: p.lng, where, sub: "Added on myrightmyride" + (p.taluka ? " · " + p.taluka : "") }))
+        items = mine.map(p => ({ name: p.name, lat: p.lat, lng: p.lng, where, sub: t("Added on myrightmyride") + (p.taluka ? " · " + p.taluka : "") }))
           .concat(j.elements.filter(el => !cat.f || cat.f(el.tags || {})).map(el => {
-            const t = el.tags || {}, name = enName(t), lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+            const tg = el.tags || {}, name = enName(tg), lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
             if (!name || lat == null) return null;
-            const kind = cat.f ? (isGovt(t) ? "Government" : "Private") : (t.amenity || t.office || t.railway || t.landuse || t.building || t.club || t.leisure || t.tourism || "").replace(/_/g, " ");
-            return { name, lat, lng, where, sub: [kind, t["addr:city"] || t["addr:suburb"] || ""].filter(Boolean).join(" · ") };
+            const kind = cat.f ? (isGovt(tg) ? t("Government") : t("Private")) : (tg.amenity || tg.office || tg.railway || tg.landuse || tg.building || tg.club || tg.leisure || tg.tourism || "").replace(/_/g, " ");
+            return { name, lat, lng, where, sub: [kind, tg["addr:city"] || tg["addr:suburb"] || ""].filter(Boolean).join(" · ") };
           }).filter(Boolean))
           .filter(x => { const k = x.name + x.lat.toFixed(3); if (seen.has(k)) return false; seen.add(k); return true; })
           .sort((a, b) => a.name.localeCompare(b.name));
         $("lpFilter").hidden = false; $("lpFilter").value = ""; draw();
-        st(`${items.length} found in ${where}.`);
-      } catch { st("Could not load places right now. The map server may be busy. Please try again in a minute."); }
+        st(t("{n} found in {w}.", { n: items.length, w: where }));
+      } catch { st(t("Could not load places right now. The map server may be busy. Please try again in a minute.")); }
     };
   }
 
   window.Places = {
     init(cfg) { CFG = { ...CFG, ...cfg }; },
-    attachSearch, openListPicker, reverse, esc,
+    attachSearch, openListPicker, reverse, esc, findStation,
   };
 })();

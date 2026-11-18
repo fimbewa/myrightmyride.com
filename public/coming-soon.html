@@ -21,23 +21,32 @@
 <body>
 <main class="cs">
   <section class="card">
+    <div class="row" style="justify-content:flex-end"><select id="langSel" class="lang" aria-label="Language / भाषा"></select></div>
     <div class="brand">myrightmyride<span>.com</span></div>
-    <h1>Coming soon</h1>
-    <p class="lead">Book a bike, auto or car from anywhere, with <b>no commission</b> from drivers or passengers.</p>
-    <div class="vehs"><span>Bike</span><span>Auto</span><span>Car</span></div>
-    <div class="free">Pay the driver directly, as per the vehicle's own meter, by cash, UPI or card. The site never takes a fee.</div>
-    <p class="note"><b>Disclaimer:</b> <span id="disc">myrightmyride.com is a citizens' initiative operated by MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED. It is not approved by, or connected with, any government body.</span></p>
+    <h1 data-i18n="Coming soon">Coming soon</h1>
+    <p class="lead" data-i18n="Book a bike, auto or car from anywhere, with no commission from drivers or passengers.">Book a bike, auto or car from anywhere, with no commission from drivers or passengers.</p>
+    <div class="vehs"><span data-i18n="Bike">Bike</span><span data-i18n="Auto">Auto</span><span data-i18n="Car">Car</span></div>
+    <div class="free" data-i18n="Pay the driver directly, as per the vehicle's own meter, by cash, UPI or card. The site never takes a fee.">Pay the driver directly, as per the vehicle's own meter, by cash, UPI or card. The site never takes a fee.</div>
+    <p class="note"><b data-i18n="Disclaimer:">Disclaimer:</b> <span id="disc">myrightmyride.com is a citizens' initiative operated by MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED. It is not approved by, or connected with, any government body.</span></p>
     <p class="note" id="op">Operated by MAYKRA TECHNOLOGIES (OPC) PRIVATE LIMITED · CIN U62010MR2026OPC477927 · Registered office: Plot No. 964/1, Durga Mata Mandir, Subhash Nagar, Dhule City, Dhule 424001, Maharashtra</p>
   </section>
 </main>
+<script src="/js/i18n.js"></script>
 <script>
-  // Use the owner's current wording from the owner panel.
-  fetch("/api/config").then(r => r.json()).then(c => {
-    if (c.governmentDisclaimer) document.getElementById("disc").textContent = c.governmentDisclaimer;
-    document.getElementById("op").textContent = [c.operatorName && "Operated by " + c.operatorName, c.operatorCin && "CIN " + c.operatorCin,
-      c.operatorAddress && "Registered office: " + c.operatorAddress, c.contactEmail && "Email: " + c.contactEmail,
-      c.contactPhone && "Phone: " + c.contactPhone].filter(Boolean).join(" · ");
-  }).catch(() => {});
+  // Use the owner's current wording from the owner panel, in the chosen language.
+  let cfg = null;
+  function show() {
+    I18N.applyStatic();
+    if (!cfg) return;
+    const t = I18N.t;
+    if (cfg.governmentDisclaimer) document.getElementById("disc").textContent = I18N.tText(cfg.governmentDisclaimer, cfg.operatorName);
+    document.getElementById("op").textContent = [cfg.operatorName && t("Operated by {name}", { name: cfg.operatorName }), cfg.operatorCin && "CIN " + cfg.operatorCin,
+      cfg.operatorAddress && t("Registered office: {a}", { a: cfg.operatorAddress }), cfg.contactEmail && t("Email: {e}", { e: cfg.contactEmail }),
+      cfg.contactPhone && t("Phone: {p}", { p: cfg.contactPhone })].filter(Boolean).join(" · ");
+  }
+  I18N.picker(document.getElementById("langSel"), show);
+  show();
+  fetch("/api/config").then(r => r.json()).then(c => { cfg = c; show(); }).catch(() => {});
 </script>
 </body>
 </html>

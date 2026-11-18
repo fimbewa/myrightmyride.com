@@ -80,6 +80,21 @@ CREATE TABLE IF NOT EXISTS places (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS places_area ON places(state, district, taluka, category);
+CREATE TABLE IF NOT EXISTS complaints (
+  id INTEGER PRIMARY KEY,
+  ticket TEXT UNIQUE,
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL,                -- passenger or driver
+  ride_id INTEGER,
+  category TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- open, in_progress, resolved, closed
+  reply TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS complaints_user ON complaints(user_id);
+CREATE INDEX IF NOT EXISTS complaints_status ON complaints(status);
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

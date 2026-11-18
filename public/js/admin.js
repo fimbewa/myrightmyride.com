@@ -49,7 +49,7 @@
 
   async function load() {
     V().innerHTML = '<p class="note">Loading…</p>';
-    try { await ({ overview, users, drivers, rides, texts, options, places })[tab](); }
+    try { await ({ overview, users, drivers, rides, complaints, texts, options, places })[tab](); }
     catch (e) { V().innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   }
 
@@ -58,7 +58,7 @@
     const [o, st] = await Promise.all([api("/api/admin/overview"), api("/api/admin/settings")]);
     const s = [["Users", o.users], ["Logged in", o.loggedIn], ["Active in last 5 min", o.activeNow], ["Drivers", o.drivers],
       ["Drivers waiting for approval", o.driversPending], ["Drivers online", o.driversOnline], ["Rides in last 24 h", o.ridesToday],
-      ["Rides in progress", o.ridesOpen], ["Insured rides, 24 h", o.insuredToday], ["Places waiting for approval", o.placesPending]];
+      ["Rides in progress", o.ridesOpen], ["Complaints waiting", o.complaintsOpen], ["Insured rides, 24 h", o.insuredToday], ["Places waiting for approval", o.placesPending]];
     V().innerHTML = `<div class="box ${st.comingSoon ? "" : "hl"}">
         <div class="row between"><h2>${st.comingSoon ? "🚧 Website shows “Coming soon”" : "✅ Website is open to the public"}</h2></div>
         <p class="note">${st.comingSoon ? "Visitors see only the Coming soon page and cannot log in or book. You can still use the real website in this browser while you are logged in here."
@@ -127,6 +127,37 @@
         <td>${r.finalFare != null ? "₹" + esc(r.finalFare) : r.fareMode === "fixed" ? "₹" + esc(r.fixedFare) + " (decided)" : "As per meter"}</td>
         <td>${esc(r.payMethod)}${r.paid ? ' <span class="on">✓ paid</span>' : ""}</td><td>${esc(r.insurance)}</td></tr>`).join("")
         || '<tr><td colspan="9" class="note">No rides yet.</td></tr>'}</tbody></table></div>`;
+  }
+
+  // ---------- complaints ----------
+  const C_CAT = { driver: "Driver's behaviour", passenger: "Passenger's behaviour", fare: "Fare or overcharging", safety: "Safety", payment: "Payment",
+    vehicle: "Vehicle condition", lost: "Lost item", app: "Website problem", other: "Other" };
+  const C_ST = { open: "Open", in_progress: "Being looked into", resolved: "Resolved", closed: "Closed" };
+  const C_PILL = { open: "s-requested", in_progress: "s-accepted", resolved: "s-started", closed: "s-completed" };
+  let cFilter = "";
+  async function complaints() {
+    const list = await api("/api/admin/complaints" + (cFilter ? "?status=" + cFilter : ""));
+    V().innerHTML = `<div class="row between"><h2>Complaints</h2>
+        <select id="cf" style="max-width:220px"><option value="">All complaints</option>${Object.entries(C_ST).map(([k, v]) => `<option value="${k}" ${cFilter === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      <p class="note">Every complaint gets a ticket number. Your reply and status are shown to the person on the website straight away.</p>
+      <div class="list">${list.map(c => `<div class="req" data-cid="${c.id}">
+        <div class="row between"><b class="mono">${esc(c.ticket)}</b><span class="pill ${C_PILL[c.status]}">${esc(C_ST[c.status])}</span></div>
+        <div><b>${esc(C_CAT[c.category] || c.category)}</b> · from ${esc(c.user?.name)} (${esc(c.role)}) · <span class="mono">${esc(c.user?.phone)}</span> · ${when(c.createdAt)}</div>
+        ${c.ride ? `<div class="note">Ride #${c.ride.id}: ${esc(c.ride.from)} → ${esc(c.ride.to)}, ${when(c.ride.at)}</div>` : ""}
+        <p style="margin:0;white-space:pre-wrap">${esc(c.description)}</p>
+        <label>Your reply (the person sees this)<textarea data-f="reply" style="min-height:60px">${esc(c.reply || "")}</textarea></label>
+        <div class="row"><select data-f="status" style="max-width:200px">${Object.entries(C_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+          <button class="btn small" data-csave="${c.id}" type="button">Save</button><span class="note" data-cmsg></span></div></div>`).join("")
+        || '<p class="note">No complaints here.</p>'}</div>`;
+    $("cf").onchange = e => { cFilter = e.target.value; load(); };
+    V().onclick = async e => {
+      const b = e.target.closest("[data-csave]"); if (!b) return;
+      const box = b.closest("[data-cid]");
+      try {
+        await api(`/api/admin/complaints/${b.dataset.csave}`, { method: "POST", body: { status: box.querySelector('[data-f="status"]').value, reply: box.querySelector('[data-f="reply"]').value } });
+        box.querySelector("[data-cmsg]").textContent = "Saved.";
+      } catch (err) { box.querySelector("[data-cmsg]").textContent = err.message; }
+    };
   }
 
   // ---------- website texts ----------

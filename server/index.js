@@ -344,6 +344,42 @@ app.post("/api/places/suggest", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- complaints (help desk with ticket numbers) ----------
+const cleanText = (s, n) => String(s ?? "").replace(/[\u0000-\u0009\u000b-\u001f]/g, " ").trim().slice(0, n); // keeps line breaks
+const COMPLAINT_CATS = ["driver", "passenger", "fare", "safety", "payment", "vehicle", "lost", "app", "other"];
+const COMPLAINT_STATUS = ["open", "in_progress", "resolved", "closed"];
+function complaintView(c) {
+  const ride = c.ride_id ? db.prepare("SELECT id, pickup_label, drop_label, created_at FROM rides WHERE id = ?").get(c.ride_id) : null;
+  return { id: c.id, ticket: c.ticket, role: c.role, category: c.category, description: c.description, status: c.status, reply: c.reply,
+    createdAt: c.created_at, updatedAt: c.updated_at, ride: ride ? { id: ride.id, from: ride.pickup_label, to: ride.drop_label, at: ride.created_at } : null };
+}
+app.post("/api/complaints", auth, (req, res) => {
+  const b = req.body || {};
+  const category = COMPLAINT_CATS.includes(b.category) ? b.category : null;
+  const description = cleanText(b.description, 2000);
+  if (!category) return bad(res, "Choose what the complaint is about.");
+  if (description.length < 10) return bad(res, "Please describe the problem in a few words (at least 10 letters).");
+  let rideId = null;
+  if (b.rideId) {
+    const r = db.prepare("SELECT id FROM rides WHERE id = ? AND (passenger_id = ? OR driver_id = ?)").get(Number(b.rideId), req.user.id, req.user.id);
+    if (!r) return bad(res, "That ride is not one of yours.");
+    rideId = r.id;
+  }
+  const recent = db.prepare("SELECT COUNT(*) n FROM complaints WHERE user_id = ? AND created_at > ?").get(req.user.id, now() - 24 * 3600_000).n;
+  if (recent >= 10) return bad(res, "You have raised many complaints today. Please wait for a reply.", 429);
+  const role = b.role === "driver" && driverOf(req.user.id) ? "driver" : "passenger";
+  const t = now();
+  const info = db.prepare("INSERT INTO complaints(user_id, role, ride_id, category, description, created_at, updated_at) VALUES(?,?,?,?,?,?,?)")
+    .run(req.user.id, role, rideId, category, description, t, t);
+  const d = new Date(t + 5.5 * 3600_000); // India time for the date part of the ticket
+  const ticket = "MR" + d.toISOString().slice(2, 10).replace(/-/g, "") + String(info.lastInsertRowid).padStart(5, "0");
+  db.prepare("UPDATE complaints SET ticket = ? WHERE id = ?").run(ticket, info.lastInsertRowid);
+  res.json(complaintView(db.prepare("SELECT * FROM complaints WHERE id = ?").get(info.lastInsertRowid)));
+});
+app.get("/api/complaints/mine", auth, (req, res) => {
+  res.json(db.prepare("SELECT * FROM complaints WHERE user_id = ? ORDER BY created_at DESC LIMIT 100").all(req.user.id).map(complaintView));
+});
+
 // ---------- admin ----------
 app.post("/api/admin/login", (req, res) => {
   const pw = process.env.ADMIN_PASSWORD;
@@ -372,6 +408,7 @@ app.get("/api/admin/overview", adminAuth, (req, res) => {
     ridesOpen: c("SELECT COUNT(*) n FROM rides WHERE status IN ('requested','accepted','started')"),
     insuredToday: db.prepare("SELECT COUNT(*) n FROM rides WHERE created_at > ? AND insurance != 'none'").get(dayAgo).n,
     placesPending: c("SELECT COUNT(*) n FROM places WHERE status = 'pending'"),
+    complaintsOpen: c("SELECT COUNT(*) n FROM complaints WHERE status IN ('open','in_progress')"),
   });
 });
 app.get("/api/admin/users", adminAuth, (req, res) => {
@@ -395,6 +432,21 @@ app.get("/api/admin/rides", adminAuth, (req, res) => {
   const rows = db.prepare("SELECT * FROM rides ORDER BY created_at DESC LIMIT 500").all();
   res.json(rows.map(r => ({ ...rideView(r, { id: -1 }), passenger: db.prepare("SELECT name, phone FROM users WHERE id = ?").get(r.passenger_id),
     driver: r.driver_id ? db.prepare("SELECT u.name, u.phone, d.vehicle_no FROM users u LEFT JOIN drivers d ON d.user_id = u.id WHERE u.id = ?").get(r.driver_id) : null, track: undefined })));
+});
+app.get("/api/admin/complaints", adminAuth, (req, res) => {
+  const st = COMPLAINT_STATUS.includes(req.query.status) ? req.query.status : null;
+  const rows = db.prepare(`SELECT * FROM complaints ${st ? "WHERE status = ?" : ""} ORDER BY (status IN ('open','in_progress')) DESC, created_at DESC LIMIT 1000`).all(...(st ? [st] : []));
+  res.json(rows.map(c => ({ ...complaintView(c), user: db.prepare("SELECT name, phone FROM users WHERE id = ?").get(c.user_id) })));
+});
+app.post("/api/admin/complaints/:id", adminAuth, (req, res) => {
+  const c = db.prepare("SELECT * FROM complaints WHERE id = ?").get(Number(req.params.id));
+  if (!c) return bad(res, "Complaint not found.", 404);
+  const status = COMPLAINT_STATUS.includes(req.body.status) ? req.body.status : c.status;
+  const reply = req.body.reply != null ? cleanText(req.body.reply, 2000) : c.reply;
+  db.prepare("UPDATE complaints SET status = ?, reply = ?, updated_at = ? WHERE id = ?").run(status, reply || null, now(), c.id);
+  const view = complaintView(db.prepare("SELECT * FROM complaints WHERE id = ?").get(c.id));
+  io.to("user:" + c.user_id).emit("complaint", view);
+  res.json(view);
 });
 app.get("/api/admin/settings", adminAuth, (req, res) => res.json(settings.getAll()));
 app.put("/api/admin/settings", adminAuth, (req, res) => res.json(settings.save(req.body || {})));

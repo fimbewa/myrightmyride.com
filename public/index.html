@@ -16,9 +16,12 @@
       <div class="brand">myrightmyride<span>.com</span></div>
       <div class="tag" id="tagline"></div>
     </div>
-    <div class="seg" id="roleSeg" role="group" aria-label="I am a" hidden>
-      <button id="roleP" aria-pressed="true">Passenger</button>
-      <button id="roleD" aria-pressed="false">Driver</button>
+    <div class="row">
+      <select id="langSel" class="lang" aria-label="Language / भाषा"></select>
+      <div class="seg" id="roleSeg" role="group" aria-label="I am a" hidden>
+        <button id="roleP" aria-pressed="true" data-i18n="Passenger">Passenger</button>
+        <button id="roleD" aria-pressed="false" data-i18n="Driver">Driver</button>
+      </div>
     </div>
   </header>
   <div id="who" class="who" hidden></div>
@@ -27,26 +30,29 @@
   <section id="loginView" class="card" hidden></section>
 
   <section class="card mapcard" id="mapCard">
-    <div class="maphead"><span id="mapHint">Map data © OpenStreetMap contributors</span><button class="btn sec small" id="locateMe" type="button">📍 My location</button></div>
+    <div class="maphead"><span id="mapHint">Map data © OpenStreetMap contributors</span><button class="btn sec small" id="locateMe" type="button" data-i18n="📍 My location">📍 My location</button></div>
     <div id="map"></div>
   </section>
 
   <section id="pView" class="card" hidden></section>
   <section id="dView" class="card" hidden></section>
   <section id="tlView" class="card" hidden></section>
+  <section id="helpView" class="card" hidden></section>
 
   <footer class="foot">
     <div class="free" id="noCommission"></div>
-    <p class="note"><b>Disclaimer:</b> <span id="govDisclaimer"></span></p>
-    <p class="note"><b>Passenger safety:</b> <span id="safetyText"></span></p>
+    <p class="note"><b data-i18n="Disclaimer:">Disclaimer:</b> <span id="govDisclaimer"></span></p>
+    <p class="note"><b data-i18n="Passenger safety:">Passenger safety:</b> <span id="safetyText"></span></p>
     <p class="note" id="operatorLine"></p>
-    <p class="note"><a href="/admin">Owner login</a></p>
+    <p class="note"><a href="/admin" data-i18n="Owner login">Owner login</a></p>
   </footer>
 </div>
 <div id="sheet" class="sheet" hidden></div>
 <script src="/vendor/leaflet/leaflet.js"></script>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/js/i18n.js"></script>
 <script src="/data/places-maharashtra.js"></script>
+<script src="/data/stations.js"></script>
 <script src="/js/places.js"></script>
 <script src="/js/app.js"></script>
 </body>

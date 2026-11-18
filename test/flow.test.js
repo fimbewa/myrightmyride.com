@@ -105,6 +105,22 @@ test("full ride flow", async () => {
   const ov = (await call("GET", "/api/admin/overview", null, aT)).data;
   assert.equal(ov.users, 2);
 
+  // complaints: ticket number, admin reply, owner sees it
+  assert.equal((await call("POST", "/api/complaints", { category: "fare", description: "short" }, pT)).status, 400);
+  assert.equal((await call("POST", "/api/complaints", { category: "fare", rideId: 99999, description: "Driver asked for more than the meter." }, pT)).status, 400);
+  const cp = await call("POST", "/api/complaints", { category: "fare", rideId: id, description: "Driver asked for more than the meter.\nPlease check." }, pT);
+  assert.equal(cp.status, 200, JSON.stringify(cp.data));
+  assert.match(cp.data.ticket, /^MR\d{6}\d{5}$/);
+  assert.equal(cp.data.ride.id, id);
+  assert.match(cp.data.description, /\n/);
+  const adm = (await call("GET", "/api/admin/complaints?status=open", null, aT)).data;
+  assert.equal(adm.length, 1); assert.equal(adm[0].user.phone, "9876543210");
+  assert.equal((await call("POST", `/api/admin/complaints/${cp.data.id}`, { status: "resolved", reply: "Refund arranged with driver." }, aT)).status, 200);
+  const mineC = (await call("GET", "/api/complaints/mine", null, pT)).data;
+  assert.equal(mineC[0].status, "resolved"); assert.equal(mineC[0].reply, "Refund arranged with driver.");
+  assert.equal((await call("GET", "/api/complaints/mine", null, dT)).data.length, 0, "others' complaints stay private");
+  assert.equal((await call("GET", "/api/admin/overview", null, aT)).data.complaintsOpen, 0);
+
   // logout
   assert.equal((await call("POST", "/api/auth/logout", {}, pT)).status, 200);
   assert.equal((await call("GET", "/api/me", null, pT)).status, 401);
