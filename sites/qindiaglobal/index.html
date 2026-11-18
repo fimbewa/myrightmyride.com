@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d3557">
+<title>qindiaglobal.com · Queue up, board with dignity</title>
+<meta name="description" content="A citizens' initiative for self-discipline and orderly queues at every place in public transport: bus stops, railway stations, metro, ticket counters and taxi stands.">
+<style>
+  :root{--ink:#14213d;--muted:#5c6474;--bg:#f4f6fa;--card:#fff;--line:#dfe3ec;--accent:#e85d04;--deep:#1d3557}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans","Noto Sans Devanagari",sans-serif;color:var(--ink);background:var(--bg)}
+  main{max-width:640px;margin:0 auto;padding:24px 16px 40px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px 20px;display:grid;gap:18px}
+  .top{display:flex;justify-content:flex-end}
+  select{font:inherit;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink)}
+  .brand{text-align:center;font-weight:800;font-size:30px;letter-spacing:-.5px}
+  .brand b{color:var(--accent)}
+  .brand span{color:var(--muted);font-weight:600}
+  h1{margin:0;text-align:center;font-size:30px;line-height:1.2;color:var(--deep)}
+  .lead{margin:0;text-align:center;font-size:17px}
+  .queue{display:flex;justify-content:center;align-items:flex-end;gap:6px;padding:6px 0}
+  .queue i{display:block;width:16px;border-radius:8px 8px 3px 3px;background:var(--deep)}
+  .queue i:nth-child(1){height:44px;background:var(--accent)}.queue i:nth-child(2){height:38px}.queue i:nth-child(3){height:46px}.queue i:nth-child(4){height:36px}.queue i:nth-child(5){height:42px}
+  h2{margin:4px 0 0;font-size:18px;color:var(--deep)}
+  ol{margin:0;padding-left:22px;display:grid;gap:6px}
+  .places{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .places span{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:600;background:var(--bg)}
+  .soon{background:var(--deep);color:#fff;border-radius:14px;padding:14px 16px;text-align:center;font-weight:600}
+  .note{margin:0;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <div class="top"><select id="lang" aria-label="Language / भाषा">
+      <option value="en">English</option><option value="hi">हिन्दी</option><option value="mr">मराठी</option>
+    </select></div>
+    <div class="brand"><b>Q</b>india<span>global.com</span></div>
+    <div class="queue" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <h1 data-t="h1"></h1>
+    <p class="lead" data-t="lead"></p>
+    <h2 data-t="rulesH"></h2>
+    <ol>
+      <li data-t="r1"></li><li data-t="r2"></li><li data-t="r3"></li><li data-t="r4"></li><li data-t="r5"></li>
+    </ol>
+    <h2 data-t="placesH"></h2>
+    <div class="places"><span data-t="p1"></span><span data-t="p2"></span><span data-t="p3"></span><span data-t="p4"></span><span data-t="p5"></span></div>
+    <div class="soon" data-t="soon"></div>
+    <p class="note"><b data-t="discH"></b> <span data-t="disc"></span></p>
+  </section>
+</main>
+<script>
+const T = {
+  en: {
+    h1: "Queue up. Board with dignity.",
+    lead: "A citizens' initiative for self-discipline at every place in public transport. No pushing, no rushing, no crowding at the door. Everyone waits in line and everyone gets on.",
+    rulesH: "Five simple habits",
+    r1: "Stand in a single line and wait for your turn.",
+    r2: "Let people get off first, then get on.",
+    r3: "Give way to elders, people with disabilities, pregnant women and parents with small children.",
+    r4: "Do not push, shove or jump the line, even when you are in a hurry.",
+    r5: "Ask others politely to join the line, and set the example yourself.",
+    placesH: "Where it matters",
+    p1: "Bus stops", p2: "Railway stations", p3: "Metro", p4: "Ticket counters", p5: "Auto and taxi stands",
+    soon: "Coming soon. Help us make orderly queues a habit across India.",
+    discH: "Disclaimer:",
+    disc: "qindiaglobal.com is a citizens' initiative. It is not approved by, or connected with, any government body or transport operator."
+  },
+  hi: {
+    h1: "कतार में रहें। सम्मान से सवार हों।",
+    lead: "सार्वजनिक परिवहन की हर जगह पर आत्म-अनुशासन के लिए एक नागरिक पहल। न धक्का, न भागदौड़, न दरवाज़े पर भीड़। सब कतार में इंतज़ार करें और सब सवार हों।",
+    rulesH: "पाँच आसान आदतें",
+    r1: "एक कतार में खड़े हों और अपनी बारी का इंतज़ार करें।",
+    r2: "पहले उतरने वालों को उतरने दें, फिर चढ़ें।",
+    r3: "बुज़ुर्गों, दिव्यांगजनों, गर्भवती महिलाओं और छोटे बच्चों वाले माता-पिता को पहले जगह दें।",
+    r4: "जल्दी में हों तब भी धक्का न दें और कतार न तोड़ें।",
+    r5: "दूसरों से विनम्रता से कतार में आने को कहें, और खुद उदाहरण बनें।",
+    placesH: "कहाँ ज़रूरी है",
+    p1: "बस स्टॉप", p2: "रेलवे स्टेशन", p3: "मेट्रो", p4: "टिकट काउंटर", p5: "ऑटो और टैक्सी स्टैंड",
+    soon: "जल्द आ रहा है। पूरे भारत में कतार को आदत बनाने में हमारी मदद करें।",
+    discH: "अस्वीकरण:",
+    disc: "qindiaglobal.com एक नागरिक पहल है। इसे किसी भी सरकारी संस्था या परिवहन संचालक की मंज़ूरी नहीं है, और न ही इसका उनसे कोई संबंध है।"
+  },
+  mr: {
+    h1: "रांगेत राहा. सन्मानाने प्रवास करा.",
+    lead: "सार्वजनिक वाहतुकीच्या प्रत्येक ठिकाणी स्वयंशिस्तीसाठी नागरिकांचा उपक्रम. धक्काबुक्की नाही, घाई नाही, दारात गर्दी नाही. सगळे रांगेत थांबतात आणि सगळे चढतात.",
+    rulesH: "पाच सोप्या सवयी",
+    r1: "एका रांगेत उभे राहा आणि आपल्या पाळीची वाट पाहा.",
+    r2: "आधी उतरणाऱ्यांना उतरू द्या, मग चढा.",
+    r3: "ज्येष्ठ नागरिक, दिव्यांग, गर्भवती महिला आणि लहान मुलांसोबतच्या पालकांना आधी जागा द्या.",
+    r4: "घाईत असलात तरी धक्का देऊ नका आणि रांग मोडू नका.",
+    r5: "इतरांना नम्रपणे रांगेत यायला सांगा, आणि स्वतः उदाहरण बना.",
+    placesH: "कुठे गरजेचे आहे",
+    p1: "बस थांबे", p2: "रेल्वे स्थानके", p3: "मेट्रो", p4: "तिकीट खिडक्या", p5: "रिक्षा आणि टॅक्सी स्टँड",
+    soon: "लवकरच येत आहे. संपूर्ण भारतात रांग ही सवय बनवण्यासाठी आम्हाला मदत करा.",
+    discH: "अस्वीकरण:",
+    disc: "qindiaglobal.com हा नागरिकांचा उपक्रम आहे. याला कोणत्याही सरकारी संस्थेची किंवा वाहतूक संस्थेची मान्यता नाही, आणि त्याचा त्यांच्याशी संबंध नाही."
+  }
+};
+const sel = document.getElementById("lang");
+function apply(l) {
+  const d = T[l] || T.en;
+  document.documentElement.lang = l;
+  document.querySelectorAll("[data-t]").forEach(e => { e.textContent = d[e.dataset.t]; });
+  try { localStorage.setItem("lang", l); } catch {}
+}
+let start = "en";
+try { start = localStorage.getItem("lang") || (navigator.language || "en").slice(0, 2); } catch {}
+if (!T[start]) start = "en";
+sel.value = start; apply(start);
+sel.onchange = () => apply(sel.value);
+</script>
+</body>
+</html>
