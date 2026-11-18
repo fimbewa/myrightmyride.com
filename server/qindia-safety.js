@@ -88,4 +88,23 @@ function isBad(text, withLinks = true) {
   return ["fuck", "motherf", "madarchod", "behenchod", "bhenchod", "chutiya", "porn", "blowjob", "onlyfans"].some(st => squashed.includes(st));
 }
 
-module.exports = { humanCheck, solve, isBad, MIN_FILL_MS };
+// Lines that pass the filter are shown at once. These "doubtful" ones wait for the owner instead:
+// shouting in capitals, lots of symbols or repeated letters, angry words, or politics/religion (rules say no attacks).
+const DOUBT_WORDS = [
+  "kill", "die", "dead", "hate", "stupid", "idiot", "fool", "bloody", "damn", "hell", "shame", "useless", "beat", "slap", "attack",
+  "modi", "rahul", "gandhi family", "bjp", "congress", "shiv sena", "election", "vote", "party", "hindu", "muslim", "islam",
+  "christian", "sikh", "jihad", "allah", "pakistan", "caste", "dalit", "brahmin", "bihari", "madrasi", "bhaiya", "outsider",
+  "नफ़रत", "नफरत", "बेवकूफ", "मूर्ख", "पागल", "चुनाव", "वोट", "पार्टी", "हिंदू", "हिन्दू", "मुस्लिम", "मुसलमान", "जाति", "भाजपा", "कांग्रेस",
+  "मूर्ख", "वेडा", "मराठी माणूस", "भैया",
+];
+function isDoubtful(text) {
+  const s = String(text || ""), low = " " + s.toLowerCase() + " ";
+  const letters = s.match(/[a-z]/gi) || [], caps = s.match(/[A-Z]/g) || [];
+  if (letters.length >= 10 && caps.length / letters.length > 0.6) return true;
+  if (/(.)\1{4,}/u.test(s)) return true;
+  const symbols = s.replace(/[\p{L}\p{M}\p{N}\s.,!?'"()-]/gu, "");
+  if (symbols.length > Math.max(3, s.length * 0.15)) return true;
+  return DOUBT_WORDS.some(w => /^[a-z ]+$/.test(w) ? new RegExp("[^a-z]" + w + "[^a-z]").test(low) : low.includes(w));
+}
+
+module.exports = { humanCheck, solve, isBad, isDoubtful, MIN_FILL_MS };

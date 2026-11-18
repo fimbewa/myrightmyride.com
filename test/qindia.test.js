@@ -9,7 +9,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qi-"));
 process.env.DB_FILE = path.join(dir, "test.db");
 process.env.ADMIN_PASSWORD = "testpass123";
 process.env.QI_MIN_FILL_MS = "0";
-const { solve, isBad } = require("../server/qindia-safety");
+const { solve, isBad, isDoubtful } = require("../server/qindia-safety");
 const { server } = require("../server/index.js");
 let port;
 before(() => new Promise(r => server.listen(0, () => { port = server.address().port; r(); })));
@@ -134,7 +134,7 @@ test("rude, sexual or abusive words and links are refused; normal words are fine
   for (const ok of ["Pune", "Vancouver, BC", "Gandhinagar", "I will always wait my turn", "Mahatma Gandhi Road", "मैं कतार में खड़ा रहूँगा", "Kozhikode", "dengue free"]) assert.ok(!isBad(ok), ok);
 });
 
-test("personal pledge page and Pledge wall with owner approval", async () => {
+test("personal pledge page and Pledge wall: clean lines show at once, doubtful ones wait for the owner", async () => {
   assert.equal((await pledge({ city: "Mumbai", wall: "Nice porn site" })).data.error, "bad", "rude lines are refused");
   assert.equal((await pledge({ city: "Mumbai", wall: "see www.spam.in" })).data.error, "bad", "links are refused");
   const p = await pledge({ name: "Meera Iyer", city: "Mumbai", country: "India", lang: "hi", wall: "Let people get off first <b>please</b>" });
@@ -147,24 +147,29 @@ test("personal pledge page and Pledge wall with owner approval", async () => {
   assert.match(page.text, /data-lang="hi"/);
   assert.match(page.text, /og:url" content="https:\/\/qindiaglobal.com\/p\//);
   assert.doesNotMatch(page.text, /\{\{/, "every blank is filled");
-  assert.doesNotMatch(page.text, /Let people get off/, "wall line is not shown before approval");
+  assert.equal(p.data.wall, "ok", "a clean line goes on the wall at once");
   assert.equal((await call("GET", "/p/nosuchpage")).text.includes("Meera"), false);
-  assert.equal((await call("GET", "/api/wall")).data.items.length, 0, "nothing shows before approval");
-
+  const loud = await pledge({ city: "Thane", wall: "I HATE PEOPLE WHO PUSH AT THE DOOR" });
+  assert.equal(loud.data.wall, "pending", "a doubtful line waits");
   const { token } = (await call("POST", "/api/admin/login", { password: "brandnew123" })).data;
   let s = (await call("GET", "/api/admin/summary", null, { token })).data;
   assert.equal(s.wallPending, 1);
-  const id = s.wall[0].id;
-  await call("POST", "/api/admin/wall/" + id, { action: "ok" }, { token });
+  assert.equal((await call("GET", "/api/wall")).data.items.length, 1, "the doubtful line is not shown yet");
+  await call("POST", "/api/admin/wall/" + s.wall[0].id, { action: "ok" }, { token });
+  assert.equal((await call("GET", "/api/wall")).data.items.length, 2, "shown after the owner approves it");
+  await call("POST", "/api/admin/wall/" + s.wall[0].id, { action: "delete" }, { token });
   const w = (await call("GET", "/api/wall")).data.items;
+  const id = w[0].id;
   assert.equal(w.length, 1);
   assert.equal(w[0].name, "Meera", "only the first name is public");
   assert.equal(w[0].text, "Let people get off first b please /b", "no HTML gets through");
   assert.match((await call("GET", "/p/" + p.data.slug)).text, /Let people get off first/);
   for (let i = 0; i < 3; i++) await call("POST", `/api/wall/${id}/report`, {});
+  assert.ok(isDoubtful("Vote for my party") && !isDoubtful("Let people get off first"));
   assert.equal((await call("GET", "/api/wall")).data.items.length, 0, "3 reports take it down until checked again");
   s = (await call("GET", "/api/admin/summary", null, { token })).data;
-  assert.equal(s.wall[0].reports, 3);
+  assert.equal(s.wall.find(x => x.id === id).reports, 3);
+  assert.equal(s.wall.find(x => x.id === id).wall_status, "pending");
   await call("POST", "/api/admin/wall/" + id, { action: "ban" }, { token });
   assert.equal((await pledge({ city: "Mumbai" })).status, 403, "a blocked sender cannot post again");
   await call("POST", "/api/admin/unban-all", {}, { token });

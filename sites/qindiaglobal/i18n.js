@@ -23,7 +23,7 @@ window.QI_fillSelect = function (sel) {
 };
 window.QI_T = {
   en: {
-    f_wall: "A line for the Pledge wall (optional, shown after review)",
+    f_wall: "A line for the Pledge wall (optional)",
     wallH: "Pledge wall",
     wallLead: "Words from people who took the pledge.",
     my_link: "Your own pledge page. Share it so your friends join too:",
@@ -94,7 +94,7 @@ window.QI_T = {
     tagline: "A citizens' initiative. Queue up. Board with dignity."
   },
   hi: {
-    f_wall: "संकल्प दीवार के लिए एक पंक्ति (वैकल्पिक, जाँच के बाद दिखेगी)",
+    f_wall: "संकल्प दीवार के लिए एक पंक्ति (वैकल्पिक)",
     wallH: "संकल्प दीवार",
     wallLead: "संकल्प लेने वालों के शब्द।",
     my_link: "आपका अपना संकल्प पेज। इसे साझा करें ताकि आपके दोस्त भी जुड़ें:",
@@ -165,7 +165,7 @@ window.QI_T = {
     tagline: "एक नागरिक पहल। कतार में रहें। सम्मान से सवार हों।"
   },
   mr: {
-    f_wall: "संकल्प भिंतीसाठी एक ओळ (ऐच्छिक, तपासणीनंतर दिसेल)",
+    f_wall: "संकल्प भिंतीसाठी एक ओळ (ऐच्छिक)",
     wallH: "संकल्प भिंत",
     wallLead: "संकल्प केलेल्यांचे शब्द.",
     my_link: "तुमचे स्वतःचे संकल्प पान. मित्रांनीही सहभागी व्हावे म्हणून शेअर करा:",
@@ -236,7 +236,7 @@ window.QI_T = {
     tagline: "नागरिकांचा उपक्रम. रांगेत राहा. सन्मानाने प्रवास करा."
   },
   gu: {
-    f_wall: "સંકલ્પ દીવાલ માટે એક લીટી (વૈકલ્પિક, તપાસ પછી દેખાશે)",
+    f_wall: "સંકલ્પ દીવાલ માટે એક લીટી (વૈકલ્પિક)",
     wallH: "સંકલ્પ દીવાલ",
     wallLead: "સંકલ્પ લેનારાઓના શબ્દો.",
     my_link: "તમારું પોતાનું સંકલ્પ પાનું. મિત્રો પણ જોડાય તે માટે શેર કરો:",
@@ -307,7 +307,7 @@ window.QI_T = {
     tagline: "નાગરિકોની પહેલ. કતારમાં રહો. સન્માનથી સવાર થાઓ."
   },
   bn: {
-    f_wall: "অঙ্গীকার দেয়ালের জন্য একটি লাইন (ঐচ্ছিক, যাচাইয়ের পরে দেখাবে)",
+    f_wall: "অঙ্গীকার দেয়ালের জন্য একটি লাইন (ঐচ্ছিক)",
     wallH: "অঙ্গীকার দেয়াল",
     wallLead: "যাঁরা অঙ্গীকার করেছেন তাঁদের কথা।",
     my_link: "আপনার নিজের অঙ্গীকার পাতা। বন্ধুরাও যাতে যোগ দেয়, শেয়ার করুন:",
@@ -378,7 +378,7 @@ window.QI_T = {
     tagline: "নাগরিকদের উদ্যোগ। লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।"
   },
   ta: {
-    f_wall: "உறுதிமொழிச் சுவருக்கு ஒரு வரி (விருப்பம், சரிபார்த்த பின் தெரியும்)",
+    f_wall: "உறுதிமொழிச் சுவருக்கு ஒரு வரி (விருப்பம்)",
     wallH: "உறுதிமொழிச் சுவர்",
     wallLead: "உறுதிமொழி எடுத்தவர்களின் வார்த்தைகள்.",
     my_link: "உங்கள் சொந்த உறுதிமொழிப் பக்கம். நண்பர்களும் சேர பகிருங்கள்:",
@@ -449,7 +449,7 @@ window.QI_T = {
     tagline: "குடிமக்களின் முன்னெடுப்பு. வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்."
   },
   te: {
-    f_wall: "ప్రతిజ్ఞ గోడ కోసం ఒక వాక్యం (ఐచ్ఛికం, పరిశీలన తర్వాత కనిపిస్తుంది)",
+    f_wall: "ప్రతిజ్ఞ గోడ కోసం ఒక వాక్యం (ఐచ్ఛికం)",
     wallH: "ప్రతిజ్ఞ గోడ",
     wallLead: "ప్రతిజ్ఞ చేసినవారి మాటలు.",
     my_link: "మీ స్వంత ప్రతిజ్ఞ పేజీ. మీ స్నేహితులూ చేరేలా షేర్ చేయండి:",
@@ -520,7 +520,7 @@ window.QI_T = {
     tagline: "పౌరుల చొరవ. వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి."
   },
   es: {
-    f_wall: "Una frase para el Muro de compromisos (opcional, se muestra tras revisión)",
+    f_wall: "Una frase para el Muro de compromisos (opcional)",
     wallH: "Muro de compromisos",
     wallLead: "Palabras de quienes hicieron el compromiso.",
     my_link: "Tu propia página de compromiso. Compártela para que tus amigos se unan:",
@@ -591,7 +591,7 @@ window.QI_T = {
     tagline: "Una iniciativa ciudadana. Haz la fila. Sube con dignidad."
   },
   fr: {
-    f_wall: "Une phrase pour le Mur des engagements (facultatif, affichée après vérification)",
+    f_wall: "Une phrase pour le Mur des engagements (facultatif)",
     wallH: "Mur des engagements",
     wallLead: "Les mots de celles et ceux qui ont pris l'engagement.",
     my_link: "Votre propre page d'engagement. Partagez-la pour que vos amis nous rejoignent :",
@@ -662,7 +662,7 @@ window.QI_T = {
     tagline: "Une initiative citoyenne. Faites la queue. Montez avec dignité."
   },
   ar: {
-    f_wall: "سطر لجدار التعهدات (اختياري، يظهر بعد المراجعة)",
+    f_wall: "سطر لجدار التعهدات (اختياري)",
     wallH: "جدار التعهدات",
     wallLead: "كلمات من الذين قدّموا التعهد.",
     my_link: "صفحتك الخاصة بالتعهد. شاركها لينضم أصدقاؤك:",
