@@ -26,8 +26,23 @@
 <main class="wrap block">
   <section id="login" class="card">
     <h2>Owner page</h2>
-    <p>Enter the owner password: the ADMIN_PASSWORD you set in Hostinger's Docker Manager for the qindiaglobal project.</p>
+    <p>Enter the owner password.</p>
     <form id="loginForm"><input type="password" name="password" placeholder="Owner password" autocomplete="current-password" required><button class="btn">Log in</button><p class="msg bad" id="loginMsg"></p></form>
+    <p style="margin:18px 0 0"><button type="button" class="small-btn" id="resetOpen">Forgot the password? Set a new one</button></p>
+  </section>
+  <section id="reset" class="card" hidden>
+    <h2>Set a new owner password</h2>
+    <p>This proves you own the website through your GitHub account. No hPanel needed.</p>
+    <p><b>Step 1.</b> Tap the button below. GitHub opens with a new file already filled in. Scroll down and tap the green <b>Commit changes</b> button (tap it again if GitHub asks a second time).</p>
+    <p style="font-family:monospace;font-size:18px;font-weight:700;letter-spacing:1px" id="resetCode"></p>
+    <p><a class="btn" id="resetGithub" target="_blank" rel="noopener">Open GitHub</a></p>
+    <p><b>Step 2.</b> Come back here and choose your new password (at least 8 characters). It takes up to 3 minutes for the website to see the GitHub file; this page keeps trying by itself.</p>
+    <form id="resetForm">
+      <input type="password" name="p1" placeholder="New password" autocomplete="new-password" minlength="8" required>
+      <input type="password" name="p2" placeholder="New password again" autocomplete="new-password" minlength="8" required>
+      <button class="btn">Save new password</button>
+      <p class="msg" id="resetMsg"></p>
+    </form>
   </section>
   <section id="panel" hidden>
     <div class="stats">
@@ -94,6 +109,42 @@ document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => 
   const blob = await (await api("/api/admin/export/" + b.dataset.export)).blob();
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = "qindiaglobal-" + b.dataset.export + ".csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
+// ---------- set a new password through GitHub ----------
+let resetCode = ""; try { resetCode = sessionStorage.getItem("qi_reset") || ""; } catch {}
+function showReset(code, github) {
+  resetCode = code; try { sessionStorage.setItem("qi_reset", code); if (github) sessionStorage.setItem("qi_reset_gh", github); } catch {}
+  $("login").hidden = true; $("reset").hidden = false;
+  $("resetCode").textContent = code;
+  let gh = github; try { gh = gh || sessionStorage.getItem("qi_reset_gh"); } catch {}
+  $("resetGithub").href = gh || "#";
+}
+$("resetOpen").onclick = async () => {
+  const res = await fetch("/api/admin/reset/start", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).catch(() => null);
+  const d = res && await res.json().catch(() => null);
+  if (!res || !res.ok || !d) { $("loginMsg").textContent = (d && d.error) || "The server is not reachable yet."; return; }
+  showReset(d.code, d.github);
+};
+let retry = null;
+$("resetForm").onsubmit = async e => {
+  e.preventDefault(); clearTimeout(retry);
+  const f = e.target, msg = $("resetMsg"); msg.className = "msg";
+  if (f.p1.value.length < 8) { msg.textContent = "Use at least 8 characters."; msg.classList.add("bad"); return; }
+  if (f.p1.value !== f.p2.value) { msg.textContent = "The two passwords are not the same."; msg.classList.add("bad"); return; }
+  let tries = 0;
+  const attempt = async () => {
+    const res = await fetch("/api/admin/reset/finish", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: resetCode, password: f.p1.value }) }).catch(() => null);
+    const d = res && await res.json().catch(() => null);
+    if (res && res.ok && d && d.token) {
+      tok = d.token; try { sessionStorage.setItem("qi_owner", tok); sessionStorage.removeItem("qi_reset"); sessionStorage.removeItem("qi_reset_gh"); } catch {}
+      f.reset(); $("reset").hidden = true; load().catch(() => {}); return;
+    }
+    if (d && d.waiting && ++tries < 40) { msg.textContent = "Waiting for the website to see your GitHub file… (checking every 20 seconds)"; retry = setTimeout(attempt, 20000); return; }
+    msg.textContent = (d && d.error && !d.waiting) ? d.error : "The website has not seen the GitHub file yet. Check that you tapped Commit changes, then try again.";
+    msg.classList.add("bad");
+  };
+  attempt();
+};
+if (resetCode && !tok) showReset(resetCode);
 if (tok) load().catch(() => {});
 </script>
 </body>

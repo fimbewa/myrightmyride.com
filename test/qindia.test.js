@@ -28,7 +28,7 @@ test("qindiaglobal pages are served for its domain only", async () => {
   const home = await call("GET", "/");
   assert.equal(home.status, 200);
   assert.match(home.text, /Qindiaglobal/);
-  for (const p of ["/i18n.js", "/site.js", "/site.css", "/poster.html", "/admin", "/sitemap.xml", "/robots.txt", "/og.png"]) assert.equal((await call("GET", p)).status, 200, p);
+  for (const p of ["/i18n.js", "/i18n-in1.js", "/i18n-in2.js", "/site.js", "/site.css", "/poster.html", "/admin", "/sitemap.xml", "/robots.txt", "/og.png"]) assert.equal((await call("GET", p)).status, 200, p);
   const www = await call("GET", "/", null, { host: "www.qindiaglobal.com" });
   assert.match(www.text, /Qindiaglobal/);
   const other = await call("GET", "/", null, { host: "myrightmyride.com" });
@@ -37,8 +37,9 @@ test("qindiaglobal pages are served for its domain only", async () => {
 
 test("every language has every line, including the disclaimer", () => {
   global.window = {};
-  require("../sites/qindiaglobal/i18n.js");
-  const T = window.QI_T, keys = Object.keys(T.en);
+  for (const f of ["i18n.js", "i18n-in1.js", "i18n-in2.js"]) require("../sites/qindiaglobal/" + f);
+  const T = window.QI_T, keys = Object.keys(T.en).filter(k => k !== "title");
+  assert.equal(window.QI_LANGS.filter(x => x[2] === "in").length, 22, "all 22 scheduled languages of India");
   assert.equal(window.QI_LANGS.length, Object.keys(T).length);
   for (const [l] of window.QI_LANGS) {
     for (const k of keys) assert.ok(T[l][k], `${l} is missing ${k}`);
@@ -79,4 +80,25 @@ test("owner password ignores quotes and spaces typed around it", () => {
   const keep = process.env.ADMIN_PASSWORD;
   for (const v of ['"testpass123"', " testpass123 ", "'testpass123'"]) { process.env.ADMIN_PASSWORD = v; assert.equal(ownerPassword(), "testpass123"); }
   process.env.ADMIN_PASSWORD = keep;
+});
+
+test("owner can set a new password after proving it through a GitHub file", async () => {
+  const start = await call("POST", "/api/admin/reset/start", {});
+  assert.equal(start.status, 200);
+  assert.match(start.data.code, /^QI-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.match(start.data.github, /github\.com\/fimbewa\/myrightmyride\.com\/new\/main\?filename=owner-reset%2FQI-/);
+  const waiting = await call("POST", "/api/admin/reset/finish", { code: start.data.code, password: "brandnew123" });
+  assert.equal(waiting.status, 409, "no GitHub file yet, so it must wait");
+  const dirPath = path.join(__dirname, "..", "owner-reset"), file = path.join(dirPath, start.data.code);
+  fs.mkdirSync(dirPath, { recursive: true }); fs.writeFileSync(file, "test");
+  try {
+    assert.equal((await call("POST", "/api/admin/reset/finish", { code: start.data.code, password: "short" })).status, 400);
+    const done = await call("POST", "/api/admin/reset/finish", { code: start.data.code, password: "brandnew123" });
+    assert.equal(done.status, 200);
+    assert.ok(done.data.token);
+    assert.equal((await call("POST", "/api/admin/reset/finish", { code: start.data.code, password: "again12345" })).status, 410, "a code works once");
+    assert.equal((await call("POST", "/api/admin/login", { password: "testpass123" })).status, 401, "old password no longer works");
+    assert.equal((await call("POST", "/api/admin/login", { password: "brandnew123" })).status, 200);
+    assert.equal((await call("POST", "/api/admin/login", { password: "brandnew123" }, { host: "myrightmyride.com" })).status, 200, "same password on the other owner page");
+  } finally { fs.rmSync(file, { force: true }); }
 });

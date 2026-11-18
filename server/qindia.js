@@ -71,11 +71,39 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
 
   // ---------- owner page (same owner password as the myrightmyride owner panel) ----------
   r.post("/api/admin/login", (req, res) => {
-    const pw = ownerPassword();
-    if (!pw || pw.length < 8) return bad(res, "The owner password is not set on the server, or is shorter than 8 characters.", 503);
     if (limited(req, "login", 10, 15 * 60_000)) return bad(res, "Too many tries. Wait 15 minutes.", 429);
-    const given = Buffer.from(sha(String((req.body || {}).password || ""))), want = Buffer.from(sha(pw));
-    if (!crypto.timingSafeEqual(given, want)) return bad(res, "Wrong password.", 401);
+    const result = ownerPassword.checkOwner(String((req.body || {}).password || ""));
+    if (result === "unset") return bad(res, "No owner password is set yet. Use \"Set a new password\" below.", 503);
+    if (result !== "ok") return bad(res, "Wrong password.", 401);
+    const t = crypto.randomBytes(24).toString("hex");
+    db.prepare("INSERT INTO admin_sessions(token, created_at) VALUES(?,?)").run(t, now());
+    res.json({ token: t });
+  });
+
+  // Password reset proven through GitHub: the page shows a one-time code; the owner creates a file named after it
+  // in the GitHub repository (only people who can change the website can do that). The app downloads new code
+  // from GitHub every few minutes, sees the file, and then lets that code set a new owner password.
+  db.exec("CREATE TABLE IF NOT EXISTS owner_resets (code TEXT PRIMARY KEY, created_at INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0)");
+  const REPO_WEB = String(process.env.REPO || "https://github.com/fimbewa/myrightmyride.com.git").replace(/\.git$/, "");
+  const RESET_DIR = path.join(__dirname, "..", "owner-reset");
+  const CODE_RX = /^QI-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
+  r.post("/api/admin/reset/start", (req, res) => {
+    if (limited(req, "reset", 6, 3600_000)) return bad(res, "Too many tries. Wait an hour.", 429);
+    const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", pick = () => Array.from(crypto.randomBytes(4), b => abc[b % abc.length]).join("");
+    const code = `QI-${pick()}-${pick()}-${pick()}`;
+    db.prepare("INSERT INTO owner_resets(code, created_at) VALUES(?,?)").run(code, now());
+    const branch = process.env.REPO_BRANCH || "main";
+    res.json({ code, github: `${REPO_WEB}/new/${branch}?filename=${encodeURIComponent("owner-reset/" + code)}&value=${encodeURIComponent("Owner password reset for qindiaglobal.com")}` });
+  });
+  r.post("/api/admin/reset/finish", (req, res) => {
+    const b = req.body || {}, code = String(b.code || "").toUpperCase().trim(), pw = String(b.password || "");
+    if (!CODE_RX.test(code)) return bad(res, "That code is not valid.");
+    const row = db.prepare("SELECT * FROM owner_resets WHERE code = ?").get(code);
+    if (!row || row.used || now() - row.created_at > 24 * 3600_000) return bad(res, "This code has expired. Start again.", 410);
+    if (!require("fs").existsSync(path.join(RESET_DIR, code))) return res.status(409).json({ error: "waiting", waiting: true });
+    if (pw.length < 8) return bad(res, "The new password must be at least 8 characters.");
+    ownerPassword.setOwnerPassword(pw);
+    db.prepare("UPDATE owner_resets SET used = 1 WHERE code = ?").run(code);
     const t = crypto.randomBytes(24).toString("hex");
     db.prepare("INSERT INTO admin_sessions(token, created_at) VALUES(?,?)").run(t, now());
     res.json({ token: t });

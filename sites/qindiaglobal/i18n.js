@@ -1,10 +1,26 @@
 // All the words on qindiaglobal.com, in every language. To fix a word, change it here and redeploy.
 // A missing line in any language falls back to English automatically.
+// [code, name in its own script, group]. "in" = languages of India (the 22 scheduled languages), "world" = others.
 window.QI_LANGS = [
-  ["en", "English"], ["hi", "हिन्दी"], ["mr", "मराठी"], ["gu", "ગુજરાતી"], ["bn", "বাংলা"],
-  ["ta", "தமிழ்"], ["te", "తెలుగు"], ["es", "Español"], ["fr", "Français"], ["ar", "العربية"]
+  ["en", "English", "world"],
+  ["as", "অসমীয়া (Assamese)", "in"], ["bn", "বাংলা (Bengali)", "in"], ["brx", "बड़ो (Bodo)", "in"], ["doi", "डोगरी (Dogri)", "in"],
+  ["gu", "ગુજરાતી (Gujarati)", "in"], ["hi", "हिन्दी (Hindi)", "in"], ["kn", "ಕನ್ನಡ (Kannada)", "in"], ["ks", "کٲشُر (Kashmiri)", "in"],
+  ["kok", "कोंकणी (Konkani)", "in"], ["mai", "मैथिली (Maithili)", "in"], ["ml", "മലയാളം (Malayalam)", "in"], ["mni", "মৈতৈলোন্ (Manipuri)", "in"],
+  ["mr", "मराठी (Marathi)", "in"], ["ne", "नेपाली (Nepali)", "in"], ["or", "ଓଡ଼ିଆ (Odia)", "in"], ["pa", "ਪੰਜਾਬੀ (Punjabi)", "in"],
+  ["sa", "संस्कृतम् (Sanskrit)", "in"], ["sat", "ᱥᱟᱱᱛᱟᱲᱤ (Santali)", "in"], ["sd", "سنڌي (Sindhi)", "in"], ["ta", "தமிழ் (Tamil)", "in"],
+  ["te", "తెలుగు (Telugu)", "in"], ["ur", "اردو (Urdu)", "in"],
+  ["es", "Español", "world"], ["fr", "Français", "world"], ["ar", "العربية", "world"]
 ];
-window.QI_RTL = ["ar"];
+window.QI_RTL = ["ar", "ur", "sd", "ks"];
+// Fills a <select> with the languages: Indian languages first, then the rest of the world.
+window.QI_fillSelect = function (sel) {
+  const groups = [["in", "भारत · India"], ["world", "World"]];
+  for (const [g, label] of groups) {
+    const og = document.createElement("optgroup"); og.label = label;
+    window.QI_LANGS.filter(x => x[2] === g).forEach(([c, n]) => og.append(new Option(n, c)));
+    sel.append(og);
+  }
+};
 window.QI_T = {
   en: {
     nav_photos: "Photos",
@@ -523,14 +539,19 @@ window.QI_pick = function () {
   const ok = l => !!window.QI_T[l];
   let l = new URLSearchParams(location.search).get("lang");
   if (!ok(l)) { try { l = localStorage.getItem("qi_lang"); } catch { l = null; } }
-  if (!ok(l)) l = (navigator.languages || [navigator.language || "en"]).map(x => String(x).slice(0, 2).toLowerCase()).find(ok);
+  if (!ok(l)) l = (navigator.languages || [navigator.language || "en"]).map(x => String(x).toLowerCase().split("-")[0]).find(ok);
   return ok(l) ? l : "en";
 };
 // Fills every element that has data-t="key" (text) or data-ph="key" (placeholder).
 window.QI_apply = function (l) {
-  const d = window.QI_T[l] || {}, en = window.QI_T.en, t = k => d[k] || en[k] || "";
+  const d = window.QI_T[l] || {}, en = window.QI_T.en, t = k => d[k] || (k === "title" && d.h1 ? "Qindiaglobal · " + d.h1 : "") || en[k] || "";
   document.documentElement.lang = l;
   document.documentElement.dir = window.QI_RTL.includes(l) ? "rtl" : "ltr";
+  // Santali's Ol Chiki letters are missing on some phones: fetch the free Noto font only when needed.
+  if (l === "sat" && !document.getElementById("font-olck")) {
+    const f = document.createElement("link"); f.id = "font-olck"; f.rel = "stylesheet";
+    f.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Ol+Chiki:wght@400;700&display=swap"; document.head.append(f);
+  }
   document.querySelectorAll("[data-t]").forEach(e => { e.textContent = t(e.dataset.t); });
   document.querySelectorAll("[data-ph]").forEach(e => { e.placeholder = t(e.dataset.ph); e.setAttribute("aria-label", t(e.dataset.ph)); });
   try { localStorage.setItem("qi_lang", l); } catch {}
