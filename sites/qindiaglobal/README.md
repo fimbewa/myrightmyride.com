@@ -23,4 +23,6 @@ The app answers for any Host listed in `SITE2_DOMAIN` (default `qindiaglobal.com
 must **forward** qindiaglobal.com to the app (`reverse_proxy app:3000`), as in `docker-compose.yml`. If Caddy only serves
 these files directly, the page still shows, but the pledge counter and forms cannot save.
 
-After changing anything, restart the Docker project so the app downloads the new code.
+Updates go live by themselves: the app checks GitHub every 3 minutes (`AUTO_UPDATE_MINUTES`, 0 = off), downloads
+new code from `main` and restarts the website in a few seconds. Only changes to `docker-compose.yml` (the web server
+settings) still need a Redeploy in hPanel.

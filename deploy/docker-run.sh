@@ -32,4 +32,39 @@ echo "=================================================="
   done
 ) &
 
-exec node server/index.js
+# Automatic updates: every few minutes, check GitHub for new code. When there is some, download it and restart
+# the website (a few seconds). So a change merged on GitHub goes live by itself, with no hPanel steps.
+# Set AUTO_UPDATE_MINUTES=0 to switch this off.
+APP_DIR="$(pwd)"
+RUN_DIR="$(mktemp -d)"
+EVERY="${AUTO_UPDATE_MINUTES:-3}"
+if [ -d "$APP_DIR/.git" ] && [ "$EVERY" != "0" ]; then
+  (
+    while sleep "${AUTO_UPDATE_SECONDS:-$(( EVERY * 60 ))}"; do
+      git -C "$APP_DIR" fetch -q origin 2>/dev/null || continue
+      OLD="$(git -C "$APP_DIR" rev-parse HEAD)"; NEW="$(git -C "$APP_DIR" rev-parse '@{u}' 2>/dev/null)" || continue
+      [ "$OLD" = "$NEW" ] && continue
+      echo "Update found on GitHub: ${NEW:0:7}. Installing..."
+      git -C "$APP_DIR" merge -q --ff-only '@{u}' || { echo "Update could not be applied; keeping the current version."; continue; }
+      if ! (cd "$APP_DIR" && npm ci --omit=dev --no-audit --no-fund --loglevel=error); then
+        echo "Update failed to install; going back to the previous version."
+        git -C "$APP_DIR" reset -q --hard "$OLD"; (cd "$APP_DIR" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
+        continue
+      fi
+      # If this start-up script itself changed, restart the whole container so the new script is used.
+      git -C "$APP_DIR" diff --quiet "$OLD" HEAD -- deploy/docker-run.sh || touch "$RUN_DIR/full-restart"
+      echo "Update installed. Restarting the website."
+      kill -TERM "$(cat "$RUN_DIR/node.pid")" 2>/dev/null
+    done
+  ) &
+fi
+
+# Run the website, and start it again if it stops (after an update, or a crash).
+trap 'kill -TERM "$(cat "$RUN_DIR/node.pid" 2>/dev/null)" 2>/dev/null; exit 0' TERM INT
+while true; do
+  node server/index.js &
+  echo $! > "$RUN_DIR/node.pid"
+  wait $!
+  [ -f "$RUN_DIR/full-restart" ] && { echo "Restarting the container to use the new start-up script."; exit 0; }
+  sleep 3
+done
