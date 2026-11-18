@@ -73,3 +73,10 @@ test("owner page needs the password and sees pledges and messages", async () => 
   assert.match(csv.type, /text\/csv/);
   assert.match(csv.text, /Pune/);
 });
+
+test("owner password ignores quotes and spaces typed around it", () => {
+  const ownerPassword = require("../server/owner-password");
+  const keep = process.env.ADMIN_PASSWORD;
+  for (const v of ['"testpass123"', " testpass123 ", "'testpass123'"]) { process.env.ADMIN_PASSWORD = v; assert.equal(ownerPassword(), "testpass123"); }
+  process.env.ADMIN_PASSWORD = keep;
+});

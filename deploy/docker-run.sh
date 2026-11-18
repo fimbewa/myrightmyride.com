@@ -3,14 +3,21 @@
 DATA_DIR="$(dirname "${DB_FILE:-/data/myrightmyride.db}")"
 PW_FILE="$DATA_DIR/admin-password.txt"
 mkdir -p "$DATA_DIR/backups"
-if [ -z "${ADMIN_PASSWORD:-}" ]; then
+# ADMIN_PASSWORD (if set, from docker-compose / the project's Environment section) always wins over the stored one.
+ADMIN_PASSWORD="$(printf '%s' "${ADMIN_PASSWORD:-}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")"
+echo "=================================================="
+if [ -n "$ADMIN_PASSWORD" ]; then
+  export ADMIN_PASSWORD
+  echo " Owner password: the one you set in ADMIN_PASSWORD (${#ADMIN_PASSWORD} characters)."
+  [ "${#ADMIN_PASSWORD}" -lt 8 ] && echo " WARNING: it must be at least 8 characters, or owner login will not work."
+else
   [ -s "$PW_FILE" ] || head -c 64 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20 > "$PW_FILE"
   chmod 600 "$PW_FILE"
   ADMIN_PASSWORD="$(cat "$PW_FILE")"; export ADMIN_PASSWORD
+  echo " OWNER PANEL PASSWORD (created for you):  $ADMIN_PASSWORD"
+  echo " To use your own instead, set ADMIN_PASSWORD and redeploy."
 fi
-echo "=================================================="
-echo " OWNER PANEL PASSWORD:  $ADMIN_PASSWORD"
-echo " Owner panel:  https://${DOMAIN:-myrightmyride.com}/admin"
+echo " Owner pages:  https://${DOMAIN:-myrightmyride.com}/admin  and  https://${SITE2_DOMAIN:-qindiaglobal.com}/admin"
 echo "=================================================="
 
 # Daily backup of the database, keeping 30 days, in the same data volume.

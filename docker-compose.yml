@@ -11,7 +11,9 @@ services:
       SMS_PROVIDER: console        # test mode: no SMS is sent
       SHOW_OTP_ON_SCREEN: "true"   # test mode: the login OTP is shown on screen
       REPO: https://github.com/fimbewa/myrightmyride.com.git
-      # ADMIN_PASSWORD: "your-own-password"   # optional; otherwise one is created for you
+      # Owner password: put ADMIN_PASSWORD=your-own-password in this project's Environment (.env) section, at least 8 characters.
+      # If it is empty, a password is created for you and kept in the data volume.
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       - app_data:/data
       - app_code:/srv
