@@ -36,7 +36,7 @@ services:
       - "443:443/udp"
     environment:
       DOMAIN: myrightmyride.com
-      SITE2_DOMAIN: qindiaglobal.com   # a separate simple website, served from sites/qindiaglobal in this repository
+      SITE2_DOMAIN: qindiaglobal.com   # a separate website (sites/qindiaglobal), served by the app so its pledge counter and forms work
     volumes:
       - app_code:/srv:ro
       - caddy_data:/data
@@ -46,7 +46,7 @@ services:
       - -c
       - |
         printf '%s, www.%s {\n\tencode gzip\n\treverse_proxy app:3000\n}\n' "$$DOMAIN" "$$DOMAIN" > /etc/caddy/Caddyfile
-        [ -n "$$SITE2_DOMAIN" ] && printf '%s, www.%s {\n\tencode gzip\n\troot * /srv/app/sites/qindiaglobal\n\tfile_server\n}\n' "$$SITE2_DOMAIN" "$$SITE2_DOMAIN" >> /etc/caddy/Caddyfile
+        [ -n "$$SITE2_DOMAIN" ] && printf '%s, www.%s {\n\tencode gzip\n\treverse_proxy app:3000\n}\n' "$$SITE2_DOMAIN" "$$SITE2_DOMAIN" >> /etc/caddy/Caddyfile
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
 
 volumes:

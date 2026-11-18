@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qindiaglobal owner page</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.stat b{display:block;font-size:26px;color:var(--deep)}
+.item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.item.done{opacity:.55}
+.item .meta{font-size:13px;color:var(--muted)}
+.item p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.small-btn{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap bar-in"><a class="brand" href="/"><b>Q</b>india<span>global</span></a><button id="logout" class="small-btn" hidden>Log out</button></div></header>
+<main class="wrap block">
+  <section id="login" class="card">
+    <h2>Owner page</h2>
+    <p>Enter the owner password. It is the same password as the owner panel of the server (shown in the "app" container's logs on Hostinger).</p>
+    <form id="loginForm"><input type="password" name="password" placeholder="Owner password" autocomplete="current-password" required><button class="btn">Log in</button><p class="msg bad" id="loginMsg"></p></form>
+  </section>
+  <section id="panel" hidden>
+    <div class="stats">
+      <div class="stat"><b id="sPledges">0</b>pledges</div>
+      <div class="stat"><b id="sToday">0</b>in last 24 hours</div>
+      <div class="stat"><b id="sOpen">0</b>new messages</div>
+    </div>
+    <div class="tools">
+      <button class="small-btn" data-export="pledges">Download pledges (Excel/CSV)</button>
+      <button class="small-btn" data-export="messages">Download messages (Excel/CSV)</button>
+      <button class="small-btn" id="refresh">Refresh</button>
+    </div>
+    <h2>Messages</h2>
+    <div id="messages"></div>
+    <h2>Top cities</h2>
+    <table class="tbl" id="cities"></table>
+    <h2 style="margin-top:20px">Latest pledges</h2>
+    <table class="tbl" id="pledges"></table>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let tok = ""; try { tok = sessionStorage.getItem("qi_owner") || ""; } catch {}
+const KIND = { volunteer: "Volunteer", idea: "Idea", partner: "Partnership", other: "Other" };
+const when = ms => new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json", authorization: "Bearer " + tok } });
+  if (res.status === 401) { show(false); throw new Error("login"); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Server not reachable");
+  return res;
+}
+function show(on) { $("login").hidden = on; $("panel").hidden = !on; $("logout").hidden = !on; if (!on) { tok = ""; try { sessionStorage.removeItem("qi_owner"); } catch {} } }
+async function load() {
+  const d = await (await api("/api/admin/summary")).json();
+  show(true);
+  $("sPledges").textContent = d.pledges; $("sToday").textContent = d.pledgesToday; $("sOpen").textContent = d.openMessages;
+  const box = $("messages"); box.replaceChildren();
+  if (!d.messages.length) box.append(el("p", null, "No messages yet."));
+  d.messages.forEach(m => {
+    const it = el("div", "item" + (m.done ? " done" : ""));
+    it.append(el("div", "meta", [KIND[m.kind] || m.kind, when(m.created_at), m.lang].filter(Boolean).join(" · ")));
+    it.append(el("div", null, [m.name, m.city, m.contact].filter(Boolean).join(" · ") || "(no name)"));
+    it.append(el("p", null, m.message));
+    const b = el("button", "small-btn", m.done ? "Mark as new" : "Mark as done");
+    b.onclick = async () => { await api("/api/admin/messages/" + m.id + "/done", { method: "POST", body: JSON.stringify({ done: !m.done }) }); load(); };
+    it.append(b); box.append(it);
+  });
+  const fill = (tbl, rows, cols) => { tbl.replaceChildren(); rows.forEach(r => { const tr = el("tr"); cols(r).forEach(c => tr.append(el("td", null, c))); tbl.append(tr); }); };
+  fill($("cities"), d.topCities, r => [[r.city, r.country].filter(Boolean).join(", "), String(r.n)]);
+  fill($("pledges"), d.latestPledges, r => [when(r.created_at), r.name || "", [r.city, r.country].filter(Boolean).join(", ")]);
+}
+$("loginForm").onsubmit = async e => {
+  e.preventDefault(); $("loginMsg").textContent = "";
+  const res = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: e.target.password.value }) }).catch(() => null);
+  const d = res && await res.json().catch(() => null);
+  if (!res || !res.ok || !d) { $("loginMsg").textContent = (d && d.error) || "The server is not reachable yet."; return; }
+  tok = d.token; try { sessionStorage.setItem("qi_owner", tok); } catch {}
+  e.target.reset(); load().catch(err => { $("loginMsg").textContent = err.message; });
+};
+$("logout").onclick = () => show(false);
+$("refresh").onclick = () => load().catch(() => {});
+document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {
+  const blob = await (await api("/api/admin/export/" + b.dataset.export)).blob();
+  const a = el("a"); a.href = URL.createObjectURL(blob); a.download = "qindiaglobal-" + b.dataset.export + ".csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+if (tok) load().catch(() => {});
+</script>
+</body>
+</html>
