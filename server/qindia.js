@@ -5,7 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const ownerPassword = require("./owner-password");
-const { humanCheck, isBad } = require("./qindia-safety");
+const { humanCheck, isBad, isDoubtful } = require("./qindia-safety");
 
 const DIR = path.join(__dirname, "..", "sites", "qindiaglobal");
 const KINDS = new Set(["volunteer", "idea", "partner", "other"]);
@@ -86,15 +86,19 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     const wall = clean(b.wall, 140);
     if (isBad(city) || isBad(b.country) || isBad(wall)) return bad(res, "bad");
     if (human.verify(b.human, b.n)) return bad(res, "human", 403);
-    if (limited(req, "pledge", 5, 3600_000)) return bad(res, "Too many pledges from this connection. Please try later.", 429);
     const h = ipHash(req);
     if (banned(h)) return bad(res, "banned", 403);
+    if (limited(req, "pledge", 5, 3600_000)) return bad(res, "Too many pledges from this connection. Please try later.", 429);
     const consent = agreed(b.consent);
     const contact = consent ? clean(b.contact, 120) || null : null;
     const slug = newSlug();
+    // Owner's rule: lines that pass the filters go on the wall at once; only doubtful ones wait for approval.
+    // A sender who had a line hidden before, or reported, also waits.
+    const flagged = !!db.prepare("SELECT 1 FROM q_pledges WHERE ip_hash = ? AND (wall_status = 'hidden' OR reports > 0) LIMIT 1").get(h);
+    const wallStatus = !wall ? null : flagged || isDoubtful(wall) || isDoubtful(b.name) ? "pending" : "ok";
     db.prepare("INSERT INTO q_pledges(name, city, country, lang, contact, consent, slug, wall, wall_status, ip_hash, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, contact, contact ? 1 : 0, slug, wall || null, wall ? "pending" : null, h, now());
-    res.json({ count: pledgeCount(), recent: recent(), slug });
+      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, contact, contact ? 1 : 0, slug, wall || null, wallStatus, h, now());
+    res.json({ count: pledgeCount(), recent: recent(), slug, wall: wallStatus });
   });
 
   r.post("/api/contact", (req, res) => {
@@ -105,9 +109,9 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     if (!agreed(b.agree)) return bad(res, "agree");
     if (isBad(message, false)) return bad(res, "bad");
     if (human.verify(b.human, b.n)) return bad(res, "human", 403);
-    if (limited(req, "contact", 5, 3600_000)) return bad(res, "Too many messages from this connection. Please try later.", 429);
     const h = ipHash(req);
     if (banned(h)) return bad(res, "banned", 403);
+    if (limited(req, "contact", 5, 3600_000)) return bad(res, "Too many messages from this connection. Please try later.", 429);
     db.prepare("INSERT INTO q_messages(kind, name, contact, city, message, lang, ip_hash, created_at) VALUES(?,?,?,?,?,?,?,?)")
       .run(KINDS.has(b.kind) ? b.kind : "other", clean(b.name, 80) || null, clean(b.contact, 120) || null, clean(b.city, 60) || null, message, clean(b.lang, 5) || null, h, now());
     res.json({ ok: true });
@@ -198,7 +202,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     db.prepare("UPDATE q_messages SET done = ? WHERE id = ?").run((req.body || {}).done === false ? 0 : 1, Number(req.params.id));
     res.json({ ok: true });
   });
-  // Pledge wall: approve (ok), hide, delete the line, or block the sender from posting again.
+  // Pledge wall: approve (ok, for doubtful lines), hide, delete the line, or block the sender from posting again.
   r.post("/api/admin/wall/:id", owner, (req, res) => {
     const id = Number(req.params.id), act = String((req.body || {}).action || "");
     const row = db.prepare("SELECT ip_hash FROM q_pledges WHERE id = ?").get(id);
