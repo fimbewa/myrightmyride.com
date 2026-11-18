@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/site.css">
 <style>
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.stat{font-size:13px}
 .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
 .stat b{display:block;font-size:26px;color:var(--deep)}
 .item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
@@ -18,6 +19,8 @@
 .tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
 .tbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.small-note{font-size:13px;color:var(--muted);margin:0 0 12px}
+.tbl th{text-align:start;padding:8px 10px;background:var(--bg);font-size:12px;color:var(--muted)}
 .small-btn{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
 </style>
 </head>
@@ -46,10 +49,17 @@
   </section>
   <section id="panel" hidden>
     <div class="stats">
-      <div class="stat"><b id="sPledges">0</b>pledges</div>
-      <div class="stat"><b id="sToday">0</b>in last 24 hours</div>
+      <div class="stat"><b id="sPledges">0</b>pledges in total</div>
+      <div class="stat"><b id="sToday">0</b>pledges in last 24 hours</div>
+      <div class="stat"><b id="sWeek">0</b>pledges in last 7 days</div>
+      <div class="stat"><b id="sContact">0</b>pledges with email/phone</div>
+      <div class="stat"><b id="sCities">0</b>cities</div>
+      <div class="stat"><b id="sCountries">0</b>countries</div>
+      <div class="stat"><b id="sVol">0</b>volunteers</div>
+      <div class="stat"><b id="sMsgs">0</b>messages in total</div>
       <div class="stat"><b id="sOpen">0</b>new messages</div>
     </div>
+    <p class="small-note">Visitors do not create accounts or log in on qindiaglobal.com: each pledge and each message is one record below. Email/phone is kept only when the person ticked the consent box.</p>
     <div class="tools">
       <button class="small-btn" data-export="pledges">Download pledges (Excel/CSV)</button>
       <button class="small-btn" data-export="messages">Download messages (Excel/CSV)</button>
@@ -59,10 +69,14 @@
     <div id="messages"></div>
     <h2>Top cities</h2>
     <table class="tbl" id="cities"></table>
-    <h2 style="margin-top:20px">Latest pledges</h2>
-    <table class="tbl" id="pledges"></table>
+    <h2 style="margin-top:20px">All pledges</h2>
+    <input id="search" placeholder="Search name, city, email or phone" style="margin-bottom:10px">
+    <div style="overflow-x:auto"><table class="tbl" id="pledges"></table></div>
+    <h2 style="margin-top:20px">Languages used</h2>
+    <table class="tbl" id="langs"></table>
   </section>
 </main>
+<script src="/i18n.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let tok = ""; try { tok = sessionStorage.getItem("qi_owner") || ""; } catch {}
@@ -93,7 +107,12 @@ async function load() {
   });
   const fill = (tbl, rows, cols) => { tbl.replaceChildren(); rows.forEach(r => { const tr = el("tr"); cols(r).forEach(c => tr.append(el("td", null, c))); tbl.append(tr); }); };
   fill($("cities"), d.topCities, r => [[r.city, r.country].filter(Boolean).join(", "), String(r.n)]);
-  fill($("pledges"), d.latestPledges, r => [when(r.created_at), r.name || "", [r.city, r.country].filter(Boolean).join(", ")]);
+  $("sWeek").textContent = d.pledgesWeek; $("sContact").textContent = d.pledgesWithContact;
+  $("sCities").textContent = d.cities; $("sCountries").textContent = d.countries; $("sMsgs").textContent = d.messagesTotal;
+  $("sVol").textContent = (d.byKind.find(k => k.kind === "volunteer") || { n: 0 }).n;
+  allPledges = d.latestPledges; drawPledges();
+  const names = {}; (window.QI_LANGS || []).forEach(([c, n]) => { names[c] = n; });
+  fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
 }
 $("loginForm").onsubmit = async e => {
   e.preventDefault(); $("loginMsg").textContent = "";
@@ -103,6 +122,16 @@ $("loginForm").onsubmit = async e => {
   tok = d.token; try { sessionStorage.setItem("qi_owner", tok); } catch {}
   e.target.reset(); load().catch(err => { $("loginMsg").textContent = err.message; });
 };
+let allPledges = [];
+function drawPledges() {
+  const q = $("search").value.trim().toLowerCase(), tbl = $("pledges");
+  const rows = allPledges.filter(r => !q || [r.name, r.city, r.country, r.contact].some(v => String(v || "").toLowerCase().includes(q)));
+  tbl.replaceChildren();
+  const head = el("tr"); ["#", "Date", "Name", "City", "Country", "Email / phone"].forEach(h => head.append(el("th", null, h))); tbl.append(head);
+  rows.forEach(r => { const tr = el("tr"); [String(r.id), when(r.created_at), r.name || "", r.city || "", r.country || "", r.contact || ""].forEach(c => tr.append(el("td", null, c))); tbl.append(tr); });
+  if (!rows.length) { const tr = el("tr"); const td = el("td", null, allPledges.length ? "No match." : "No pledges yet."); td.colSpan = 6; tr.append(td); tbl.append(tr); }
+}
+$("search").oninput = drawPledges;
 $("logout").onclick = () => show(false);
 $("refresh").onclick = () => load().catch(() => {});
 document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {

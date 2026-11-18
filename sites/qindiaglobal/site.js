@@ -96,6 +96,10 @@
     if (!res.ok || !data) throw Object.assign(new Error("api"), { status: res.status });
     return data;
   }
+  // Typing an email/phone ticks the consent box (the person can untick it); without the tick it is not saved.
+  const pf = $("pledgeForm");
+  pf.contact.addEventListener("input", () => { if (pf.contact.value.trim() && !pf.contact.dataset.touched) pf.consent.checked = true; });
+  pf.consent.addEventListener("change", () => { pf.contact.dataset.touched = "1"; });
   api("/api/pledge").then(d => { showCount(d.count); showRecent(d.recent); }).catch(() => {});
 
   const form = (id, msgId, onSubmit) => {

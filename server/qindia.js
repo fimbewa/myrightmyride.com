@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS q_messages (
 );
 CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at INTEGER NOT NULL);
 `);
+  // Added later: optional email/phone on pledges, kept only when the person ticks the consent box.
+  const pledgeCols = db.prepare("PRAGMA table_info(q_pledges)").all().map(c => c.name);
+  if (!pledgeCols.includes("contact")) db.exec("ALTER TABLE q_pledges ADD COLUMN contact TEXT");
+  if (!pledgeCols.includes("consent")) db.exec("ALTER TABLE q_pledges ADD COLUMN consent INTEGER NOT NULL DEFAULT 0");
 
   const r = express.Router();
   const now = () => Date.now();
@@ -53,8 +57,10 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
     const city = clean(b.city, 60);
     if (!city) return bad(res, "city");
     if (limited(req, "pledge", 5, 3600_000)) return bad(res, "Too many pledges from this connection. Please try later.", 429);
-    db.prepare("INSERT INTO q_pledges(name, city, country, lang, created_at) VALUES(?,?,?,?,?)")
-      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, now());
+    const consent = b.consent === true || b.consent === "on" || b.consent === "1";
+    const contact = consent ? clean(b.contact, 120) || null : null;
+    db.prepare("INSERT INTO q_pledges(name, city, country, lang, contact, consent, created_at) VALUES(?,?,?,?,?,?,?)")
+      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, contact, contact ? 1 : 0, now());
     res.json({ count: pledgeCount(), recent: recent() });
   });
 
@@ -120,9 +126,16 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
       pledges: pledgeCount(),
       pledgesToday: db.prepare("SELECT COUNT(*) AS n FROM q_pledges WHERE created_at > ?").get(day).n,
       openMessages: db.prepare("SELECT COUNT(*) AS n FROM q_messages WHERE done = 0").get().n,
+      pledgesWeek: db.prepare("SELECT COUNT(*) AS n FROM q_pledges WHERE created_at > ?").get(now() - 7 * 24 * 3600_000).n,
+      pledgesWithContact: db.prepare("SELECT COUNT(*) AS n FROM q_pledges WHERE contact IS NOT NULL").get().n,
+      messagesTotal: db.prepare("SELECT COUNT(*) AS n FROM q_messages").get().n,
+      byKind: db.prepare("SELECT kind, COUNT(*) AS n FROM q_messages GROUP BY kind").all(),
+      cities: db.prepare("SELECT COUNT(DISTINCT lower(city)) AS n FROM q_pledges").get().n,
+      countries: db.prepare("SELECT COUNT(DISTINCT lower(country)) AS n FROM q_pledges WHERE country IS NOT NULL").get().n,
+      byLang: db.prepare("SELECT ifnull(lang,'') AS lang, COUNT(*) AS n FROM q_pledges GROUP BY lang ORDER BY n DESC").all(),
       topCities: db.prepare("SELECT city, country, COUNT(*) AS n FROM q_pledges GROUP BY lower(city), lower(ifnull(country,'')) ORDER BY n DESC LIMIT 15").all(),
-      latestPledges: db.prepare("SELECT * FROM q_pledges ORDER BY id DESC LIMIT 100").all(),
-      messages: db.prepare("SELECT * FROM q_messages ORDER BY done, id DESC LIMIT 200").all(),
+      latestPledges: db.prepare("SELECT * FROM q_pledges ORDER BY id DESC LIMIT 2000").all(),
+      messages: db.prepare("SELECT * FROM q_messages ORDER BY done, id DESC LIMIT 1000").all(),
     });
   });
   r.post("/api/admin/messages/:id/done", owner, (req, res) => {
