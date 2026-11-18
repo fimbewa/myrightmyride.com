@@ -9,6 +9,7 @@ const QRCode = require("qrcode");
 const db = require("./db");
 const settings = require("./settings");
 const { sendOtp } = require("./sms");
+const ownerPassword = require("./owner-password");
 
 const PORT = Number(process.env.PORT || 3000);
 const app = express();
@@ -388,7 +389,7 @@ app.get("/api/complaints/mine", auth, (req, res) => {
 
 // ---------- admin ----------
 app.post("/api/admin/login", (req, res) => {
-  const pw = process.env.ADMIN_PASSWORD;
+  const pw = ownerPassword();
   if (!pw || pw.length < 8) return bad(res, "Set ADMIN_PASSWORD (at least 8 characters) in the server's .env file first.", 503);
   const given = Buffer.from(sha(String(req.body.password || ""))), want = Buffer.from(sha(pw));
   if (!crypto.timingSafeEqual(given, want)) return bad(res, "Wrong password.", 401);

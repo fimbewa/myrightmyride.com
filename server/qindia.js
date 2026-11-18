@@ -4,6 +4,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const ownerPassword = require("./owner-password");
 
 const DIR = path.join(__dirname, "..", "sites", "qindiaglobal");
 const KINDS = new Set(["volunteer", "idea", "partner", "other"]);
@@ -70,8 +71,8 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
 
   // ---------- owner page (same owner password as the myrightmyride owner panel) ----------
   r.post("/api/admin/login", (req, res) => {
-    const pw = process.env.ADMIN_PASSWORD;
-    if (!pw || pw.length < 8) return bad(res, "The owner password is not set on the server.", 503);
+    const pw = ownerPassword();
+    if (!pw || pw.length < 8) return bad(res, "The owner password is not set on the server, or is shorter than 8 characters.", 503);
     if (limited(req, "login", 10, 15 * 60_000)) return bad(res, "Too many tries. Wait 15 minutes.", 429);
     const given = Buffer.from(sha(String((req.body || {}).password || ""))), want = Buffer.from(sha(pw));
     if (!crypto.timingSafeEqual(given, want)) return bad(res, "Wrong password.", 401);
