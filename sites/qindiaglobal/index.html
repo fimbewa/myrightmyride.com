@@ -110,11 +110,30 @@
       </div>
       <input name="contact" maxlength="120" autocomplete="email" data-ph="f_pcontact">
       <label class="consent"><input type="checkbox" name="consent"> <span data-t="consent"></span></label>
+      <textarea name="wall" rows="2" maxlength="140" data-ph="f_wall"></textarea>
+      <p class="rules" data-t="rules"></p>
+      <label class="consent"><input type="checkbox" name="agree"> <span><span data-t="agree"></span> <a href="/terms.html" target="_blank" rel="noopener" data-t="terms_link"></a></span></label>
       <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="btn" type="submit" data-t="pledge_btn"></button>
       <p class="msg" id="pledgeMsg" role="status"></p>
     </form>
+    <div class="mine" id="mine" hidden>
+      <p><b data-t="my_link"></b></p>
+      <p><a id="mineLink" target="_blank" rel="noopener"></a></p>
+      <div class="share">
+        <a id="mWa" class="sbtn wa" target="_blank" rel="noopener">WhatsApp</a>
+        <a id="mFb" class="sbtn fb" target="_blank" rel="noopener">Facebook</a>
+        <a id="mX" class="sbtn x" target="_blank" rel="noopener">X</a>
+        <button id="mCopy" class="sbtn" type="button" data-t="copy_btn"></button>
+      </div>
+    </div>
     <p class="recent" id="recent" hidden><b data-t="recent"></b> <span id="recentList"></span></p>
+  </section>
+
+  <section id="wall" class="wrap block" hidden>
+    <h2 data-t="wallH"></h2>
+    <p data-t="wallLead"></p>
+    <div class="wall" id="wallList"></div>
   </section>
 
   <section id="share" class="wrap block">
@@ -163,6 +182,7 @@
       </div>
       <input name="contact" maxlength="120" autocomplete="email" data-ph="f_contact">
       <textarea name="message" rows="4" maxlength="2000" required data-ph="f_msg"></textarea>
+      <label class="consent"><input type="checkbox" name="agree"> <span><span data-t="agree"></span> <a href="/terms.html" target="_blank" rel="noopener" data-t="terms_link"></a></span></label>
       <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="btn" type="submit" data-t="send_btn"></button>
       <p class="msg" id="joinMsg" role="status"></p>
@@ -174,6 +194,7 @@
   <div class="wrap">
     <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
     <p><b data-t="privacyH"></b> <span data-t="privacy"></span></p>
+    <p><a class="flink" href="/terms.html" data-t="terms_link"></a> · <a class="flink" href="/terms.html#privacy" data-t="privacy_link"></a></p>
     <p class="small"><span data-t="tagline"></span> © <span id="year"></span> qindiaglobal.com</p>
   </div>
 </footer>

@@ -69,3 +69,19 @@ form label{display:grid;gap:4px;font-weight:600;font-size:14px;color:var(--muted
 #photos .ctas{margin-top:16px}
 form label.consent{display:flex;gap:8px;align-items:flex-start;font-weight:500;color:var(--ink);font-size:14px}
 form label.consent input{width:auto;margin-top:3px;flex:none}
+.rules{margin:0;font-size:13px;color:var(--muted)}
+form label.consent a{font-weight:600}
+.mine{margin-top:18px;background:var(--bg);border-radius:14px;padding:14px}
+.mine p{margin:0 0 8px}.mine #mineLink{word-break:break-all;font-weight:600}
+.wall{display:grid;gap:10px}
+.wall figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.wall blockquote{margin:0 0 6px;font-size:17px;overflow-wrap:anywhere}
+.wall figcaption{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.wall .rep{font:inherit;font-size:12px;border:0;background:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:4px}
+.flink{color:#fff}
+.pcard{text-align:center}.pcard h1{margin:6px 0 4px;overflow-wrap:anywhere}
+.pc-num{margin:0;color:var(--muted);font-weight:700;letter-spacing:.5px}
+.pc-what{margin:0 0 14px;font-size:18px;font-weight:600}
+.pcard .pledge{text-align:start}
+.pc-meta{color:var(--muted);margin:0}
+.pc-wall{font-size:18px;font-style:italic;margin:12px 0 0}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{OGTITLE}}</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1d3557">
+<meta name="description" content="A citizens' initiative for orderly queues in public transport. Take the pledge too.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Qindiaglobal">
+<meta property="og:url" content="https://qindiaglobal.com/p/{{SLUG}}">
+<meta property="og:title" content="{{OGTITLE}}">
+<meta property="og:description" content="A citizens' initiative for orderly queues in public transport. Take the pledge too.">
+<meta property="og:image" content="https://qindiaglobal.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="Qindiaglobal home"><b>Q</b>india<span>global</span></a>
+    <select id="lang" aria-label="Language"></select>
+  </div>
+</header>
+<main class="wrap">
+  <section class="card pcard" id="pcard" data-slug="{{SLUG}}" data-name="{{NAME}}" data-lang="{{LANG}}">
+    <div class="queue" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="pc-num"><span data-t="pc_num"></span> {{NUM}}</p>
+    <h1 id="pcName">{{NAME}}</h1>
+    <p class="pc-what" data-t="pc_pledged"></p>
+    <blockquote class="pledge" data-t="pledgeText"></blockquote>
+    <p class="pc-meta">{{PLACE}} · {{DATE}}</p>
+    <p class="pc-wall" id="pcWall">{{WALL}}</p>
+    <div class="ctas"><a class="btn" id="joinToo" href="/#pledge" data-t="join_too"></a></div>
+  </section>
+  <section class="block">
+    <h2 data-t="share_mine"></h2>
+    <div class="share">
+      <a id="sWa" class="sbtn wa" target="_blank" rel="noopener">WhatsApp</a>
+      <a id="sFb" class="sbtn fb" target="_blank" rel="noopener">Facebook</a>
+      <a id="sX" class="sbtn x" target="_blank" rel="noopener">X</a>
+      <a id="sTg" class="sbtn tg" target="_blank" rel="noopener">Telegram</a>
+      <button id="sCopy" class="sbtn" type="button" data-t="copy_btn"></button>
+    </div>
+  </section>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
+    <p><a class="flink" href="/terms.html" data-t="terms_link"></a> · <a class="flink" href="/terms.html#privacy" data-t="privacy_link"></a></p>
+    <p class="small"><span data-t="tagline"></span> · qindiaglobal.com</p>
+  </div>
+</footer>
+<script src="/i18n.js"></script>
+<script src="/i18n-in1.js"></script>
+<script src="/i18n-in2.js"></script>
+<script src="/pledge.js"></script>
+</body>
+</html>
