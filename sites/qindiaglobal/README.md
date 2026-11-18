@@ -1,5 +1,26 @@
 # qindiaglobal.com
 
-A separate one-page website (a citizens' initiative for orderly queues in public transport). It is plain HTML with no server code.
+Qindiaglobal is a citizens' initiative for orderly queues and self-discipline at every place in public transport
+("Queue up. Board with dignity."). It is **not** approved by or connected with any government body, and every page says so.
 
-With Docker (`docker-compose.yml`), the Caddy container serves this folder for qindiaglobal.com and www.qindiaglobal.com, set by `SITE2_DOMAIN`. myrightmyride.com is not affected. To change the text, edit `index.html` (English, Hindi and Marathi are in the `T` table at the bottom) and press **Redeploy**.
+## What is here
+
+| File | What it is |
+|---|---|
+| `index.html`, `site.js`, `site.css` | The website: habits, pledge with live counter, share buttons, posters, volunteer/contact form, disclaimer |
+| `i18n.js` | **All the words, in 10 languages** (English, Hindi, Marathi, Gujarati, Bengali, Tamil, Telugu, Spanish, French, Arabic). To change a sentence, change it here. |
+| `poster.html` | Printable A4 posters (`?type=habits` or `?type=sign`, `&lang=hi` etc.) with a QR code to the site |
+| `admin.html` | Owner page at qindiaglobal.com/admin: pledges, messages, download as CSV. Uses the server's owner password. |
+| `og.png`, `icon-512.png`, `favicon.svg`, `qr.svg` | Share preview picture, app icon, browser icon, QR code |
+| `sitemap.xml`, `robots.txt` | For Google |
+
+The pledge counter, the contact form and the owner page are run by `server/qindia.js` in the Node app and saved in the
+same SQLite database (tables `q_pledges` and `q_messages`, backed up daily with the rest).
+
+## How it is served
+
+The app answers for any Host listed in `SITE2_DOMAIN` (default `qindiaglobal.com`, plus `www.`). The web server (Caddy)
+must **forward** qindiaglobal.com to the app (`reverse_proxy app:3000`), as in `docker-compose.yml`. If Caddy only serves
+these files directly, the page still shows, but the pledge counter and forms cannot save.
+
+After changing anything, restart the Docker project so the app downloads the new code.

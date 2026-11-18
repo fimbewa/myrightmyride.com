@@ -25,14 +25,10 @@ app.use((req, res, next) => {
 app.get("/tiles/:z/:x/:y", require("./tiles").handler);
 
 // qindiaglobal.com is a separate one-page website (sites/qindiaglobal). When that domain reaches this app,
-// serve its own page instead of myrightmyride.com, so it works whichever way the web server is set up.
+// serve its own site and small API (server/qindia.js) instead of myrightmyride.com.
 const SITE2_HOSTS = new Set(String(process.env.SITE2_DOMAIN || "qindiaglobal.com").toLowerCase().split(",").map(s => s.trim()).filter(Boolean).flatMap(d => [d, "www." + d]));
-const SITE2_DIR = path.join(__dirname, "..", "sites", "qindiaglobal");
-app.use((req, res, next) => {
-  if (!SITE2_HOSTS.has(String(req.hostname || "").toLowerCase())) return next();
-  res.set("Cache-Control", "no-cache");
-  express.static(SITE2_DIR, { index: "index.html" })(req, res, () => res.sendFile(path.join(SITE2_DIR, "index.html")));
-});
+const qindia = require("./qindia")(db);
+app.use((req, res, next) => (SITE2_HOSTS.has(String(req.hostname || "").toLowerCase()) ? qindia(req, res, next) : next()));
 
 // "Coming soon" mode (switched in the owner panel). Visitors get the coming-soon page and the public API is closed;
 // the owner, after logging in to /admin in the same browser, can still use and preview the real site.
