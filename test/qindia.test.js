@@ -56,6 +56,9 @@ test("pledge counter and contact form", async () => {
   assert.deepEqual(p.data.recent[0], { city: "Pune", country: "India" });
   assert.equal((await call("GET", "/api/pledge")).data.recent[0].name, undefined, "names are never shown publicly");
   assert.equal((await call("POST", "/api/pledge", { city: "Bot", website: "spam" })).data.count, 1, "hidden spam field is ignored");
+  await call("POST", "/api/pledge", { city: "Thane", contact: "no-consent@example.com" });
+  await call("POST", "/api/pledge", { city: "Nagpur", contact: "9876543210", consent: "on" });
+  assert.equal((await call("GET", "/api/pledge")).text.includes("9876543210"), false, "contacts are never public");
   assert.equal((await call("POST", "/api/contact", { kind: "volunteer" })).status, 400);
   assert.equal((await call("POST", "/api/contact", { kind: "volunteer", name: "Ravi", contact: "ravi@example.com", message: "I can help in Nashik" })).status, 200);
 });
@@ -65,7 +68,11 @@ test("owner page needs the password and sees pledges and messages", async () => 
   assert.equal((await call("POST", "/api/admin/login", { password: "nope" })).status, 401);
   const { token } = (await call("POST", "/api/admin/login", { password: "testpass123" })).data;
   const s = (await call("GET", "/api/admin/summary", null, { token })).data;
-  assert.equal(s.pledges, 1);
+  assert.equal(s.pledges, 3);
+  assert.equal(s.pledgesWithContact, 1, "email/phone is kept only with consent");
+  assert.equal(s.latestPledges.find(r => r.city === "Thane").contact, null);
+  assert.equal(s.latestPledges.find(r => r.city === "Nagpur").contact, "9876543210");
+  assert.equal(s.byKind.find(k => k.kind === "volunteer").n, 1);
   assert.equal(s.openMessages, 1);
   assert.equal(s.messages[0].message, "I can help in Nashik");
   await call("POST", `/api/admin/messages/${s.messages[0].id}/done`, {}, { token });

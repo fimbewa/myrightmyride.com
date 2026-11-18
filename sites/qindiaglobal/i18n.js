@@ -23,6 +23,8 @@ window.QI_fillSelect = function (sel) {
 };
 window.QI_T = {
   en: {
+    f_pcontact: "Email or phone (optional)",
+    consent: "Yes, Qindiaglobal may contact me about this initiative.",
     nav_photos: "Photos",
     photosH: "Every day, and how it could be",
     photosLead: "Real photos from Mumbai and other Indian cities. The difference is just a habit, and it starts with each of us.",
@@ -74,6 +76,8 @@ window.QI_T = {
     tagline: "A citizens' initiative. Queue up. Board with dignity."
   },
   hi: {
+    f_pcontact: "ईमेल या फ़ोन (वैकल्पिक)",
+    consent: "हाँ, Qindiaglobal इस पहल के बारे में मुझसे संपर्क कर सकता है।",
     nav_photos: "तस्वीरें",
     photosH: "हर दिन, और जैसा हो सकता है",
     photosLead: "मुंबई और भारत के दूसरे शहरों की असली तस्वीरें। फ़र्क़ सिर्फ़ एक आदत का है, और यह हम में से हर एक से शुरू होता है।",
@@ -125,6 +129,8 @@ window.QI_T = {
     tagline: "एक नागरिक पहल। कतार में रहें। सम्मान से सवार हों।"
   },
   mr: {
+    f_pcontact: "ईमेल किंवा फोन (ऐच्छिक)",
+    consent: "होय, Qindiaglobal या उपक्रमाबद्दल माझ्याशी संपर्क करू शकते.",
     nav_photos: "फोटो",
     photosH: "रोजचे चित्र, आणि जसे असू शकते",
     photosLead: "मुंबई आणि भारतातील इतर शहरांचे खरे फोटो. फरक फक्त एका सवयीचा आहे, आणि त्याची सुरुवात आपल्या प्रत्येकापासून होते.",
@@ -176,6 +182,8 @@ window.QI_T = {
     tagline: "नागरिकांचा उपक्रम. रांगेत राहा. सन्मानाने प्रवास करा."
   },
   gu: {
+    f_pcontact: "ઈમેલ અથવા ફોન (વૈકલ્પિક)",
+    consent: "હા, Qindiaglobal આ પહેલ વિશે મારો સંપર્ક કરી શકે છે.",
     nav_photos: "ફોટા",
     photosH: "રોજનું દૃશ્ય, અને જેવું હોઈ શકે",
     photosLead: "મુંબઈ અને ભારતના અન્ય શહેરોના સાચા ફોટા. ફરક માત્ર એક ટેવનો છે, અને તેની શરૂઆત આપણામાંથી દરેકથી થાય છે.",
@@ -227,6 +235,8 @@ window.QI_T = {
     tagline: "નાગરિકોની પહેલ. કતારમાં રહો. સન્માનથી સવાર થાઓ."
   },
   bn: {
+    f_pcontact: "ইমেল বা ফোন (ঐচ্ছিক)",
+    consent: "হ্যাঁ, Qindiaglobal এই উদ্যোগ নিয়ে আমার সাথে যোগাযোগ করতে পারে।",
     nav_photos: "ছবি",
     photosH: "প্রতিদিনের ছবি, আর যেমন হতে পারে",
     photosLead: "মুম্বই ও ভারতের অন্যান্য শহরের আসল ছবি। পার্থক্য শুধু একটা অভ্যাসের, আর তা শুরু হয় আমাদের প্রত্যেকের থেকে।",
@@ -278,6 +288,8 @@ window.QI_T = {
     tagline: "নাগরিকদের উদ্যোগ। লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।"
   },
   ta: {
+    f_pcontact: "மின்னஞ்சல் அல்லது தொலைபேசி (விருப்பம்)",
+    consent: "ஆம், இந்த முன்னெடுப்பு குறித்து Qindiaglobal என்னைத் தொடர்பு கொள்ளலாம்.",
     nav_photos: "படங்கள்",
     photosH: "தினமும், அது எப்படி இருக்கலாம்",
     photosLead: "மும்பை மற்றும் இந்தியாவின் பிற நகரங்களின் உண்மையான புகைப்படங்கள். வேறுபாடு ஒரு பழக்கம் மட்டுமே, அது நம் ஒவ்வொருவரிடமிருந்தும் தொடங்குகிறது.",
@@ -329,6 +341,8 @@ window.QI_T = {
     tagline: "குடிமக்களின் முன்னெடுப்பு. வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்."
   },
   te: {
+    f_pcontact: "ఈమెయిల్ లేదా ఫోన్ (ఐచ్ఛికం)",
+    consent: "అవును, ఈ చొరవ గురించి Qindiaglobal నన్ను సంప్రదించవచ్చు.",
     nav_photos: "ఫోటోలు",
     photosH: "ప్రతిరోజూ, ఇలా ఉండవచ్చు",
     photosLead: "ముంబై మరియు భారతదేశంలోని ఇతర నగరాల నిజమైన ఫోటోలు. తేడా ఒక అలవాటు మాత్రమే, అది మనలో ప్రతి ఒక్కరితో మొదలవుతుంది.",
@@ -380,6 +394,8 @@ window.QI_T = {
     tagline: "పౌరుల చొరవ. వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి."
   },
   es: {
+    f_pcontact: "Correo o teléfono (opcional)",
+    consent: "Sí, Qindiaglobal puede contactarme sobre esta iniciativa.",
     nav_photos: "Fotos",
     photosH: "Cada día, y cómo podría ser",
     photosLead: "Fotos reales de Mumbai y otras ciudades de la India. La diferencia es solo un hábito, y empieza por cada uno de nosotros.",
@@ -431,6 +447,8 @@ window.QI_T = {
     tagline: "Una iniciativa ciudadana. Haz la fila. Sube con dignidad."
   },
   fr: {
+    f_pcontact: "E-mail ou téléphone (facultatif)",
+    consent: "Oui, Qindiaglobal peut me contacter au sujet de cette initiative.",
     nav_photos: "Photos",
     photosH: "Chaque jour, et ce que cela pourrait être",
     photosLead: "De vraies photos de Mumbai et d'autres villes indiennes. La différence n'est qu'une habitude, et elle commence par chacun de nous.",
@@ -482,6 +500,8 @@ window.QI_T = {
     tagline: "Une initiative citoyenne. Faites la queue. Montez avec dignité."
   },
   ar: {
+    f_pcontact: "البريد الإلكتروني أو الهاتف (اختياري)",
+    consent: "نعم، يمكن لـ Qindiaglobal التواصل معي بشأن هذه المبادرة.",
     nav_photos: "صور",
     photosH: "كل يوم، وكيف يمكن أن يكون",
     photosLead: "صور حقيقية من مومباي ومدن هندية أخرى. الفرق مجرد عادة، وتبدأ من كل واحد منا.",
