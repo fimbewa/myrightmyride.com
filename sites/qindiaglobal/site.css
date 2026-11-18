@@ -38,7 +38,7 @@ h2{margin:0 0 12px;font-size:23px;color:var(--deep)}
 form{display:grid;gap:10px}
 form label{display:grid;gap:4px;font-weight:600;font-size:14px;color:var(--muted)}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.hp{position:absolute;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);opacity:0}
 .msg{margin:0;min-height:1em;font-weight:600}.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
 .recent{margin:14px 0 0;color:var(--muted);font-size:14px}
 .share{display:flex;flex-wrap:wrap;gap:8px}

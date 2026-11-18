@@ -5,7 +5,7 @@
   const sel = $("lang");
   let lang = QI_pick(), t = k => k;
 
-  QI_LANGS.forEach(([code, name]) => sel.add(new Option(name, code)));
+  QI_fillSelect(sel);
   $("year").textContent = new Date().getFullYear();
 
   function setLang(l) {
