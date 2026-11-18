@@ -25,8 +25,44 @@
     if (l === "en") u.searchParams.delete("lang"); else u.searchParams.set("lang", l);
     history.replaceState(null, "", u.pathname + u.search + u.hash);
     showCount(lastCount);
+    renderPhotos();
   }
   sel.onchange = () => setLang(sel.value);
+
+
+  // ---------- real photos (free to use under the Unsplash License; shown from Unsplash with credit) ----------
+  const U = (id, w) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=70`;
+  const PHOTOS = {
+    galCrowd: [
+      ["photo-1785243957730-30a9bde75507", "Kylli Kittus", "commuters-stand-in-the-open-doorway-of-a-crowded-train-XOO3PKGGiaM", "Mumbai"],
+      ["photo-1757841239542-c29c68d4b130", "Dhruv Bhatt", "people-walking-on-a-busy-train-station-platform-lyU8971Llrs", "Mumbai Central"],
+      ["photo-1665206221704-624dd27939ad", "Anirudh", "a-group-of-people-walking-in-a-train-station-H4ISZ-_m54w", "Churchgate, Mumbai"],
+      ["photo-1723472093218-3655345623eb", "Chinmay Chari", "KX9hz77SHO8", "Dadar, Mumbai"]
+    ],
+    galQueue: [
+      ["photo-1792057251867-258839ee1159", "Rrushik Rrawal", "western-railway-commuter-train-at-station-btp0wqLwFtw", "Mumbai"],
+      ["photo-1760816418270-fc76fda62668", "Zoshua Colah", "people-waiting-on-a-busy-metro-station-platform-R300Nf6qfH0", "Delhi Metro"],
+      ["photo-1733315384471-0b84f65775c2", "KC Shum", "a-group-of-people-waiting-for-a-train-at-a-train-station-imeRxScAw30", ""]
+    ]
+  };
+  function renderPhotos() {
+    for (const [box, list] of Object.entries(PHOTOS)) {
+      const el = $(box); el.replaceChildren();
+      for (const [id, who, page, place] of list) {
+        const f = document.createElement("figure");
+        const img = new Image();
+        img.src = U(id, 640); img.srcset = `${U(id, 480)} 480w, ${U(id, 800)} 800w`; img.sizes = "(max-width:520px) 90vw, 360px";
+        img.loading = "lazy"; img.decoding = "async"; img.alt = place ? `${place}: ${who}` : who;
+        img.onerror = () => f.remove();
+        const c = document.createElement("figcaption");
+        if (place) { const b = document.createElement("b"); b.textContent = place + " · "; c.append(b); }
+        const a = document.createElement("a");
+        a.href = `https://unsplash.com/photos/${page}?utm_source=qindiaglobal&utm_medium=referral`; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = `${t("photo")}: ${who} / Unsplash`;
+        c.append(a); f.append(img, c); el.append(f);
+      }
+    }
+  }
 
   // ---------- share ----------
   const shareLink = () => SITE + (lang === "en" ? "" : "?lang=" + lang);

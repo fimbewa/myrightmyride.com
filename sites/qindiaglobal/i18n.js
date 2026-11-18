@@ -7,6 +7,12 @@ window.QI_LANGS = [
 window.QI_RTL = ["ar"];
 window.QI_T = {
   en: {
+    nav_photos: "Photos",
+    photosH: "Every day, and how it could be",
+    photosLead: "Real photos from Mumbai and other Indian cities. The difference is just a habit, and it starts with each of us.",
+    crowdH: "Today: rushing and pushing at the door",
+    queueH: "Tomorrow: waiting our turn on the platform",
+    photo: "Photo",
     title: "Qindiaglobal · Queue up. Board with dignity.",
     desc: "A citizens' initiative for orderly queues and self-discipline at every place in public transport. Take the pledge, share it and print free posters.",
     nav_pledge: "Pledge", nav_habits: "Habits", nav_posters: "Posters", nav_join: "Join us",
@@ -52,6 +58,12 @@ window.QI_T = {
     tagline: "A citizens' initiative. Queue up. Board with dignity."
   },
   hi: {
+    nav_photos: "तस्वीरें",
+    photosH: "हर दिन, और जैसा हो सकता है",
+    photosLead: "मुंबई और भारत के दूसरे शहरों की असली तस्वीरें। फ़र्क़ सिर्फ़ एक आदत का है, और यह हम में से हर एक से शुरू होता है।",
+    crowdH: "आज: दरवाज़े पर भागदौड़ और धक्का-मुक्की",
+    queueH: "कल: प्लेटफ़ॉर्म पर अपनी बारी का इंतज़ार",
+    photo: "फ़ोटो",
     title: "Qindiaglobal · कतार में रहें। सम्मान से सवार हों।",
     desc: "सार्वजनिक परिवहन की हर जगह पर कतार और आत्म-अनुशासन के लिए एक नागरिक पहल। संकल्प लें, साझा करें और मुफ़्त पोस्टर छापें।",
     nav_pledge: "संकल्प", nav_habits: "आदतें", nav_posters: "पोस्टर", nav_join: "जुड़ें",
@@ -97,6 +109,12 @@ window.QI_T = {
     tagline: "एक नागरिक पहल। कतार में रहें। सम्मान से सवार हों।"
   },
   mr: {
+    nav_photos: "फोटो",
+    photosH: "रोजचे चित्र, आणि जसे असू शकते",
+    photosLead: "मुंबई आणि भारतातील इतर शहरांचे खरे फोटो. फरक फक्त एका सवयीचा आहे, आणि त्याची सुरुवात आपल्या प्रत्येकापासून होते.",
+    crowdH: "आज: दारात घाई आणि धक्काबुक्की",
+    queueH: "उद्या: फलाटावर आपल्या पाळीची वाट",
+    photo: "फोटो",
     title: "Qindiaglobal · रांगेत राहा. सन्मानाने प्रवास करा.",
     desc: "सार्वजनिक वाहतुकीच्या प्रत्येक ठिकाणी रांग आणि स्वयंशिस्तीसाठी नागरिकांचा उपक्रम. संकल्प करा, शेअर करा आणि मोफत पोस्टर छापा.",
     nav_pledge: "संकल्प", nav_habits: "सवयी", nav_posters: "पोस्टर", nav_join: "सहभागी व्हा",
@@ -142,6 +160,12 @@ window.QI_T = {
     tagline: "नागरिकांचा उपक्रम. रांगेत राहा. सन्मानाने प्रवास करा."
   },
   gu: {
+    nav_photos: "ફોટા",
+    photosH: "રોજનું દૃશ્ય, અને જેવું હોઈ શકે",
+    photosLead: "મુંબઈ અને ભારતના અન્ય શહેરોના સાચા ફોટા. ફરક માત્ર એક ટેવનો છે, અને તેની શરૂઆત આપણામાંથી દરેકથી થાય છે.",
+    crowdH: "આજે: દરવાજે દોડધામ અને ધક્કામુક્કી",
+    queueH: "કાલે: પ્લેટફોર્મ પર આપણા વારાની રાહ",
+    photo: "ફોટો",
     title: "Qindiaglobal · કતારમાં રહો. સન્માનથી સવાર થાઓ.",
     desc: "જાહેર પરિવહનની દરેક જગ્યાએ કતાર અને આત્મશિસ્ત માટે નાગરિકોની પહેલ. સંકલ્પ લો, શેર કરો અને મફત પોસ્ટર છાપો.",
     nav_pledge: "સંકલ્પ", nav_habits: "ટેવો", nav_posters: "પોસ્ટર", nav_join: "જોડાઓ",
@@ -187,6 +211,12 @@ window.QI_T = {
     tagline: "નાગરિકોની પહેલ. કતારમાં રહો. સન્માનથી સવાર થાઓ."
   },
   bn: {
+    nav_photos: "ছবি",
+    photosH: "প্রতিদিনের ছবি, আর যেমন হতে পারে",
+    photosLead: "মুম্বই ও ভারতের অন্যান্য শহরের আসল ছবি। পার্থক্য শুধু একটা অভ্যাসের, আর তা শুরু হয় আমাদের প্রত্যেকের থেকে।",
+    crowdH: "আজ: দরজায় তাড়াহুড়ো আর ধাক্কাধাক্কি",
+    queueH: "আগামীকাল: প্ল্যাটফর্মে নিজের পালার অপেক্ষা",
+    photo: "ছবি",
     title: "Qindiaglobal · লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।",
     desc: "গণপরিবহনের প্রতিটি জায়গায় সারিবদ্ধ লাইন ও আত্মশৃঙ্খলার জন্য নাগরিকদের উদ্যোগ। অঙ্গীকার করুন, শেয়ার করুন এবং বিনামূল্যে পোস্টার ছাপুন।",
     nav_pledge: "অঙ্গীকার", nav_habits: "অভ্যাস", nav_posters: "পোস্টার", nav_join: "যোগ দিন",
@@ -232,6 +262,12 @@ window.QI_T = {
     tagline: "নাগরিকদের উদ্যোগ। লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।"
   },
   ta: {
+    nav_photos: "படங்கள்",
+    photosH: "தினமும், அது எப்படி இருக்கலாம்",
+    photosLead: "மும்பை மற்றும் இந்தியாவின் பிற நகரங்களின் உண்மையான புகைப்படங்கள். வேறுபாடு ஒரு பழக்கம் மட்டுமே, அது நம் ஒவ்வொருவரிடமிருந்தும் தொடங்குகிறது.",
+    crowdH: "இன்று: வாசலில் அவசரமும் தள்ளுமுள்ளும்",
+    queueH: "நாளை: நடைமேடையில் நம் முறைக்காகக் காத்திருத்தல்",
+    photo: "புகைப்படம்",
     title: "Qindiaglobal · வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்.",
     desc: "பொதுப் போக்குவரத்தின் ஒவ்வொரு இடத்திலும் ஒழுங்கான வரிசைக்கும் சுயஒழுக்கத்திற்கும் குடிமக்களின் முன்னெடுப்பு. உறுதிமொழி எடுங்கள், பகிருங்கள், இலவச சுவரொட்டிகளை அச்சிடுங்கள்.",
     nav_pledge: "உறுதிமொழி", nav_habits: "பழக்கங்கள்", nav_posters: "சுவரொட்டிகள்", nav_join: "இணையுங்கள்",
@@ -277,6 +313,12 @@ window.QI_T = {
     tagline: "குடிமக்களின் முன்னெடுப்பு. வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்."
   },
   te: {
+    nav_photos: "ఫోటోలు",
+    photosH: "ప్రతిరోజూ, ఇలా ఉండవచ్చు",
+    photosLead: "ముంబై మరియు భారతదేశంలోని ఇతర నగరాల నిజమైన ఫోటోలు. తేడా ఒక అలవాటు మాత్రమే, అది మనలో ప్రతి ఒక్కరితో మొదలవుతుంది.",
+    crowdH: "ఈరోజు: తలుపు దగ్గర హడావిడి, తోపులాట",
+    queueH: "రేపు: ప్లాట్‌ఫారంపై మన వంతు కోసం వేచి ఉండటం",
+    photo: "ఫోటో",
     title: "Qindiaglobal · వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి.",
     desc: "ప్రజా రవాణాలోని ప్రతి చోటా క్రమమైన వరుస, స్వీయ క్రమశిక్షణ కోసం పౌరుల చొరవ. ప్రతిజ్ఞ చేయండి, షేర్ చేయండి, ఉచిత పోస్టర్లు ముద్రించండి.",
     nav_pledge: "ప్రతిజ్ఞ", nav_habits: "అలవాట్లు", nav_posters: "పోస్టర్లు", nav_join: "చేరండి",
@@ -322,6 +364,12 @@ window.QI_T = {
     tagline: "పౌరుల చొరవ. వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి."
   },
   es: {
+    nav_photos: "Fotos",
+    photosH: "Cada día, y cómo podría ser",
+    photosLead: "Fotos reales de Mumbai y otras ciudades de la India. La diferencia es solo un hábito, y empieza por cada uno de nosotros.",
+    crowdH: "Hoy: prisas y empujones en la puerta",
+    queueH: "Mañana: esperar nuestro turno en el andén",
+    photo: "Foto",
     title: "Qindiaglobal · Haz la fila. Sube con dignidad.",
     desc: "Una iniciativa ciudadana por filas ordenadas y autodisciplina en todo el transporte público. Haz el compromiso, compártelo e imprime carteles gratis.",
     nav_pledge: "Compromiso", nav_habits: "Hábitos", nav_posters: "Carteles", nav_join: "Únete",
@@ -367,6 +415,12 @@ window.QI_T = {
     tagline: "Una iniciativa ciudadana. Haz la fila. Sube con dignidad."
   },
   fr: {
+    nav_photos: "Photos",
+    photosH: "Chaque jour, et ce que cela pourrait être",
+    photosLead: "De vraies photos de Mumbai et d'autres villes indiennes. La différence n'est qu'une habitude, et elle commence par chacun de nous.",
+    crowdH: "Aujourd'hui : précipitation et bousculade à la porte",
+    queueH: "Demain : attendre son tour sur le quai",
+    photo: "Photo",
     title: "Qindiaglobal · Faites la queue. Montez avec dignité.",
     desc: "Une initiative citoyenne pour des files d'attente ordonnées et l'autodiscipline dans tous les transports publics. Prenez l'engagement, partagez-le et imprimez des affiches gratuites.",
     nav_pledge: "Engagement", nav_habits: "Habitudes", nav_posters: "Affiches", nav_join: "Nous rejoindre",
@@ -412,6 +466,12 @@ window.QI_T = {
     tagline: "Une initiative citoyenne. Faites la queue. Montez avec dignité."
   },
   ar: {
+    nav_photos: "صور",
+    photosH: "كل يوم، وكيف يمكن أن يكون",
+    photosLead: "صور حقيقية من مومباي ومدن هندية أخرى. الفرق مجرد عادة، وتبدأ من كل واحد منا.",
+    crowdH: "اليوم: تسرّع وتدافع عند الباب",
+    queueH: "غدًا: ننتظر دورنا على الرصيف",
+    photo: "صورة",
     title: "Qindiaglobal · قف في الطابور. اصعد بكرامة.",
     desc: "مبادرة مواطنين من أجل طوابير منظمة وانضباط ذاتي في كل أماكن النقل العام. قدّم تعهدك، وشاركه، واطبع ملصقات مجانية.",
     nav_pledge: "التعهد", nav_habits: "العادات", nav_posters: "الملصقات", nav_join: "انضم إلينا",
