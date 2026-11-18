@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const ownerPassword = require("./owner-password");
+const { humanCheck, isBad } = require("./qindia-safety");
 
 const DIR = path.join(__dirname, "..", "sites", "qindiaglobal");
 const KINDS = new Set(["volunteer", "idea", "partner", "other"]);
@@ -27,6 +28,22 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
   const pledgeCols = db.prepare("PRAGMA table_info(q_pledges)").all().map(c => c.name);
   if (!pledgeCols.includes("contact")) db.exec("ALTER TABLE q_pledges ADD COLUMN contact TEXT");
   if (!pledgeCols.includes("consent")) db.exec("ALTER TABLE q_pledges ADD COLUMN consent INTEGER NOT NULL DEFAULT 0");
+  // Added later: personal pledge page (slug), Pledge wall line (wall + wall_status: pending/ok/hidden), reports,
+  // and a one-way hash of the internet address (ip_hash) so the owner can block an abuser without storing the address.
+  for (const [c, type] of [["slug", "TEXT"], ["wall", "TEXT"], ["wall_status", "TEXT"], ["reports", "INTEGER NOT NULL DEFAULT 0"], ["ip_hash", "TEXT"]])
+    if (!pledgeCols.includes(c)) db.exec(`ALTER TABLE q_pledges ADD COLUMN ${c} ${type}`);
+  const msgCols = db.prepare("PRAGMA table_info(q_messages)").all().map(c => c.name);
+  if (!msgCols.includes("ip_hash")) db.exec("ALTER TABLE q_messages ADD COLUMN ip_hash TEXT");
+  db.exec(`
+CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL);
+`);
+  const newSlug = () => Array.from(crypto.randomBytes(8), b => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join("");
+  for (const row of db.prepare("SELECT id FROM q_pledges WHERE slug IS NULL").all()) db.prepare("UPDATE q_pledges SET slug = ? WHERE id = ?").run(newSlug(), row.id);
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS q_pledges_slug ON q_pledges(slug)");
+  let secret = (db.prepare("SELECT v FROM q_kv WHERE k = 'secret'").get() || {}).v;
+  if (!secret) { secret = crypto.randomBytes(32).toString("hex"); db.prepare("INSERT INTO q_kv(k, v) VALUES('secret', ?)").run(secret); }
+  const human = humanCheck(secret);
 
   const r = express.Router();
   const now = () => Date.now();
@@ -44,6 +61,12 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
   }
   setInterval(() => { const t = now(); for (const [k, v] of hits) if (!v.some(x => t - x < 24 * 3600_000)) hits.delete(k); }, 3600_000).unref();
 
+  const ipHash = req => crypto.createHmac("sha256", secret).update(String(req.ip || "")).digest("hex").slice(0, 24);
+  const banned = h => !!db.prepare("SELECT 1 FROM q_bans WHERE ip_hash = ?").get(h);
+  const agreed = v => v === true || v === "on" || v === "1";
+  // Public name: first word only, and none at all when it has a rude word.
+  const publicName = n => (n && !isBad(n) ? String(n).split(" ")[0] : null);
+
   const pledgeCount = () => db.prepare("SELECT COUNT(*) AS n FROM q_pledges").get().n;
   const recent = () => db.prepare("SELECT city, country FROM q_pledges ORDER BY id DESC LIMIT 8").all();
 
@@ -51,17 +74,27 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
 
   r.get("/api/pledge", (req, res) => res.json({ count: pledgeCount(), recent: recent() }));
 
+  // A fresh "only humans" token for the next form the page sends.
+  r.get("/api/human", (req, res) => res.json(human.issue()));
+
   r.post("/api/pledge", (req, res) => {
     const b = req.body || {};
     if (b.website) return res.json({ count: pledgeCount(), recent: recent() }); // spam bot filled the hidden field
     const city = clean(b.city, 60);
     if (!city) return bad(res, "city");
+    if (!agreed(b.agree)) return bad(res, "agree");
+    const wall = clean(b.wall, 140);
+    if (isBad(city) || isBad(b.country) || isBad(wall)) return bad(res, "bad");
+    if (human.verify(b.human, b.n)) return bad(res, "human", 403);
     if (limited(req, "pledge", 5, 3600_000)) return bad(res, "Too many pledges from this connection. Please try later.", 429);
-    const consent = b.consent === true || b.consent === "on" || b.consent === "1";
+    const h = ipHash(req);
+    if (banned(h)) return bad(res, "banned", 403);
+    const consent = agreed(b.consent);
     const contact = consent ? clean(b.contact, 120) || null : null;
-    db.prepare("INSERT INTO q_pledges(name, city, country, lang, contact, consent, created_at) VALUES(?,?,?,?,?,?,?)")
-      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, contact, contact ? 1 : 0, now());
-    res.json({ count: pledgeCount(), recent: recent() });
+    const slug = newSlug();
+    db.prepare("INSERT INTO q_pledges(name, city, country, lang, contact, consent, slug, wall, wall_status, ip_hash, created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+      .run(clean(b.name, 60) || null, city, clean(b.country, 60) || null, clean(b.lang, 5) || null, contact, contact ? 1 : 0, slug, wall || null, wall ? "pending" : null, h, now());
+    res.json({ count: pledgeCount(), recent: recent(), slug });
   });
 
   r.post("/api/contact", (req, res) => {
@@ -69,9 +102,28 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
     if (b.website) return res.json({ ok: true });
     const message = clean(b.message, 2000);
     if (!message) return bad(res, "message");
+    if (!agreed(b.agree)) return bad(res, "agree");
+    if (isBad(message, false)) return bad(res, "bad");
+    if (human.verify(b.human, b.n)) return bad(res, "human", 403);
     if (limited(req, "contact", 5, 3600_000)) return bad(res, "Too many messages from this connection. Please try later.", 429);
-    db.prepare("INSERT INTO q_messages(kind, name, contact, city, message, lang, created_at) VALUES(?,?,?,?,?,?,?)")
-      .run(KINDS.has(b.kind) ? b.kind : "other", clean(b.name, 80) || null, clean(b.contact, 120) || null, clean(b.city, 60) || null, message, clean(b.lang, 5) || null, now());
+    const h = ipHash(req);
+    if (banned(h)) return bad(res, "banned", 403);
+    db.prepare("INSERT INTO q_messages(kind, name, contact, city, message, lang, ip_hash, created_at) VALUES(?,?,?,?,?,?,?,?)")
+      .run(KINDS.has(b.kind) ? b.kind : "other", clean(b.name, 80) || null, clean(b.contact, 120) || null, clean(b.city, 60) || null, message, clean(b.lang, 5) || null, h, now());
+    res.json({ ok: true });
+  });
+
+  // ---------- Pledge wall: only lines the owner approved ----------
+  r.get("/api/wall", (req, res) => {
+    const rows = db.prepare("SELECT id, name, city, country, wall, created_at FROM q_pledges WHERE wall_status = 'ok' ORDER BY id DESC LIMIT 60").all();
+    res.json({ items: rows.map(x => ({ id: x.id, name: publicName(x.name), city: [x.city, x.country].filter(Boolean).join(", "), text: x.wall })) });
+  });
+  // Anyone can report a line. Three reports take it off the wall until the owner looks again.
+  r.post("/api/wall/:id/report", (req, res) => {
+    if (limited(req, "report", 20, 3600_000)) return bad(res, "Too many reports.", 429);
+    const id = Number(req.params.id);
+    db.prepare("UPDATE q_pledges SET reports = reports + 1 WHERE id = ? AND wall IS NOT NULL").run(id);
+    db.prepare("UPDATE q_pledges SET wall_status = 'pending' WHERE id = ? AND wall_status = 'ok' AND reports >= 3").run(id);
     res.json({ ok: true });
   });
 
@@ -136,12 +188,33 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
       topCities: db.prepare("SELECT city, country, COUNT(*) AS n FROM q_pledges GROUP BY lower(city), lower(ifnull(country,'')) ORDER BY n DESC LIMIT 15").all(),
       latestPledges: db.prepare("SELECT * FROM q_pledges ORDER BY id DESC LIMIT 2000").all(),
       messages: db.prepare("SELECT * FROM q_messages ORDER BY done, id DESC LIMIT 1000").all(),
+      wallPending: db.prepare("SELECT COUNT(*) AS n FROM q_pledges WHERE wall_status = 'pending'").get().n,
+      wall: db.prepare(`SELECT id, name, city, country, wall, wall_status, reports, ip_hash, created_at FROM q_pledges WHERE wall IS NOT NULL
+        ORDER BY CASE wall_status WHEN 'pending' THEN 0 WHEN 'ok' THEN 1 ELSE 2 END, reports DESC, id DESC LIMIT 500`).all(),
+      bans: db.prepare("SELECT COUNT(*) AS n FROM q_bans").get().n,
     });
   });
   r.post("/api/admin/messages/:id/done", owner, (req, res) => {
     db.prepare("UPDATE q_messages SET done = ? WHERE id = ?").run((req.body || {}).done === false ? 0 : 1, Number(req.params.id));
     res.json({ ok: true });
   });
+  // Pledge wall: approve (ok), hide, delete the line, or block the sender from posting again.
+  r.post("/api/admin/wall/:id", owner, (req, res) => {
+    const id = Number(req.params.id), act = String((req.body || {}).action || "");
+    const row = db.prepare("SELECT ip_hash FROM q_pledges WHERE id = ?").get(id);
+    if (!row) return bad(res, "Not found.", 404);
+    if (act === "ok") db.prepare("UPDATE q_pledges SET wall_status = 'ok', reports = 0 WHERE id = ?").run(id);
+    else if (act === "hide") db.prepare("UPDATE q_pledges SET wall_status = 'hidden' WHERE id = ?").run(id);
+    else if (act === "delete") db.prepare("UPDATE q_pledges SET wall = NULL, wall_status = NULL WHERE id = ?").run(id);
+    else if (act === "ban") {
+      if (row.ip_hash) {
+        db.prepare("INSERT OR IGNORE INTO q_bans(ip_hash, created_at) VALUES(?,?)").run(row.ip_hash, now());
+        db.prepare("UPDATE q_pledges SET wall_status = 'hidden' WHERE ip_hash = ? AND wall IS NOT NULL").run(row.ip_hash);
+      } else db.prepare("UPDATE q_pledges SET wall_status = 'hidden' WHERE id = ?").run(id);
+    } else return bad(res, "Unknown action.");
+    res.json({ ok: true });
+  });
+  r.post("/api/admin/unban-all", owner, (req, res) => { db.exec("DELETE FROM q_bans"); res.json({ ok: true }); });
   r.get("/api/admin/export/:what", owner, (req, res) => {
     const table = req.params.what === "messages" ? "q_messages" : "q_pledges";
     const rows = db.prepare(`SELECT * FROM ${table} ORDER BY id`).all();
@@ -158,6 +231,26 @@ CREATE TABLE IF NOT EXISTS admin_sessions (token TEXT PRIMARY KEY, created_at IN
     else res.set("Cache-Control", "no-cache");
     next();
   });
+  // Personal pledge page: qindiaglobal.com/p/<code>. Not listed for search engines; only people given the link see it.
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const fs = require("fs");
+  let pageTpl = null;
+  r.get("/p/:slug", (req, res, next) => {
+    const row = /^[a-z0-9]{6,16}$/.test(req.params.slug) && db.prepare("SELECT * FROM q_pledges WHERE slug = ?").get(req.params.slug);
+    if (!row) return next();
+    if (!pageTpl) pageTpl = fs.readFileSync(path.join(DIR, "pledge-page.html"), "utf8");
+    const name = row.name && !isBad(row.name) ? row.name : "";
+    const vals = {
+      SLUG: row.slug, NAME: name, NUM: String(row.id), LANG: row.lang || "en",
+      PLACE: [row.city, row.country].filter(s => s && !isBad(s)).join(", "),
+      DATE: new Date(row.created_at).toISOString().slice(0, 10),
+      WALL: row.wall_status === "ok" ? row.wall : "",
+      OGTITLE: (name ? name + " took" : "I took") + " the Qindiaglobal pledge: Queue up. Board with dignity.",
+    };
+    res.set("Cache-Control", "no-cache").type("html").send(pageTpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vals ? esc(vals[k]) : m)));
+  });
+
+  r.get(["/pledge-page", "/pledge-page.html"], (req, res) => res.redirect("/")); // the template itself is not a page
   r.use(express.static(DIR, { index: "index.html", extensions: ["html"] }));
   r.use((req, res) => res.sendFile(path.join(DIR, "index.html")));
   return r;

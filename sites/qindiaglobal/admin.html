@@ -58,6 +58,8 @@
       <div class="stat"><b id="sVol">0</b>volunteers</div>
       <div class="stat"><b id="sMsgs">0</b>messages in total</div>
       <div class="stat"><b id="sOpen">0</b>new messages</div>
+      <div class="stat"><b id="sWall">0</b>wall lines to check</div>
+      <div class="stat"><b id="sBans">0</b>blocked senders</div>
     </div>
     <p class="small-note">Visitors do not create accounts or log in on qindiaglobal.com: each pledge and each message is one record below. Email/phone is kept only when the person ticked the consent box.</p>
     <div class="tools">
@@ -65,6 +67,9 @@
       <button class="small-btn" data-export="messages">Download messages (Excel/CSV)</button>
       <button class="small-btn" id="refresh">Refresh</button>
     </div>
+    <h2>Pledge wall</h2>
+    <p class="small-note">A line shows on the website only after you tap <b>Approve</b>. <b>Hide</b> takes it off. <b>Block</b> hides it and stops that sender from posting again. Lines reported 3 times come back here as "waiting".</p>
+    <div id="wallItems"></div>
     <h2>Messages</h2>
     <div id="messages"></div>
     <h2>Top cities</h2>
@@ -104,6 +109,24 @@ async function load() {
     const b = el("button", "small-btn", m.done ? "Mark as new" : "Mark as done");
     b.onclick = async () => { await api("/api/admin/messages/" + m.id + "/done", { method: "POST", body: JSON.stringify({ done: !m.done }) }); load(); };
     it.append(b); box.append(it);
+  });
+  $("sWall").textContent = d.wallPending; $("sBans").textContent = d.bans;
+  const wb = $("wallItems"); wb.replaceChildren();
+  if (!d.wall.length) wb.append(el("p", null, "No Pledge wall lines yet."));
+  const ST = { pending: "Waiting for you", ok: "Shown on website", hidden: "Hidden" };
+  d.wall.forEach(w => {
+    const it = el("div", "item" + (w.wall_status === "hidden" ? " done" : ""));
+    it.append(el("div", "meta", [ST[w.wall_status] || w.wall_status, when(w.created_at), w.reports ? w.reports + " report(s)" : ""].filter(Boolean).join(" · ")));
+    it.append(el("div", null, [w.name, w.city, w.country].filter(Boolean).join(" · ") || "(no name)"));
+    it.append(el("p", null, w.wall));
+    const tools = el("div", "tools");
+    [["ok", "Approve"], ["hide", "Hide"], ["delete", "Delete line"], ["ban", "Block sender"]].forEach(([a, label]) => {
+      if ((a === "ok" && w.wall_status === "ok") || (a === "hide" && w.wall_status === "hidden")) return;
+      const b = el("button", "small-btn", label);
+      b.onclick = async () => { await api("/api/admin/wall/" + w.id, { method: "POST", body: JSON.stringify({ action: a }) }); load(); };
+      tools.append(b);
+    });
+    it.append(tools); wb.append(it);
   });
   const fill = (tbl, rows, cols) => { tbl.replaceChildren(); rows.forEach(r => { const tr = el("tr"); cols(r).forEach(c => tr.append(el("td", null, c))); tbl.append(tr); }); };
   fill($("cities"), d.topCities, r => [[r.city, r.country].filter(Boolean).join(", "), String(r.n)]);

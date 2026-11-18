@@ -26,6 +26,8 @@
     history.replaceState(null, "", u.pathname + u.search + u.hash);
     showCount(lastCount);
     renderPhotos();
+    showMine();
+    renderWall();
   }
   sel.onchange = () => setLang(sel.value);
 
@@ -93,9 +95,82 @@
   async function api(path, body) {
     const res = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
     const data = await res.json().catch(() => null);
-    if (!res.ok || !data) throw Object.assign(new Error("api"), { status: res.status });
+    if (!res.ok || !data) throw Object.assign(new Error("api"), { status: res.status, code: data && data.error });
     return data;
   }
+
+  // ---------- only humans: a signed token fetched when the page opens, plus a small sum done on the phone ----------
+  let ticket = null, ticketAt = 0;
+  const newTicket = () => { ticketAt = Date.now(); ticket = api("/api/human").catch(() => null); };
+  newTicket();
+  // Small SHA-256 (works on every phone browser, also without https).
+  const K256 = []; (() => { const f = x => (x - Math.floor(x)) * 2 ** 32 | 0; let n = 2, c = 0; while (c < 64) { let p = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { p = false; break; } if (p) K256[c++] = f(Math.cbrt(n)); n++; } })();
+  function sha256hex(str) {
+    const bytes = [...str].map(ch => ch.charCodeAt(0) & 255), l = bytes.length;
+    bytes.push(128); while (bytes.length % 64 !== 56) bytes.push(0);
+    const bits = l * 8; for (let i = 7; i >= 0; i--) bytes.push(i > 3 ? 0 : (bits >>> (i * 8)) & 255);
+    let h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    const w = new Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let o = 0; o < bytes.length; o += 64) {
+      for (let i = 0; i < 16; i++) w[i] = (bytes[o + 4 * i] << 24) | (bytes[o + 4 * i + 1] << 16) | (bytes[o + 4 * i + 2] << 8) | bytes[o + 4 * i + 3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = r(w[i - 15], 7) ^ r(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = r(w[i - 2], 17) ^ r(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let [a, b, c, d, e, f, g, k] = h;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (k + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) | 0;
+        const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        k = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h = h.map((x, i) => (x + [a, b, c, d, e, f, g, k][i]) | 0);
+    }
+    return h.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+  }
+  async function prove() {
+    const tk = await ticket, wait = ticketAt + 3300 - Date.now(); newTicket();
+    if (!tk) return {};
+    if (wait > 0) await new Promise(r => setTimeout(r, wait)); // a person needs a few seconds to fill a form anyway
+    for (let n = 0; n < 5e6; n++) if (sha256hex(tk.token + ":" + n).startsWith(tk.work)) return { human: tk.token, n };
+    return {};
+  }
+  const ERR = { city: "err_city", message: "err_msg", agree: "err_agree", bad: "err_bad", human: "err_wait" };
+
+  // ---------- my own pledge page ----------
+  let mySlug = null; try { mySlug = localStorage.getItem("qi_slug"); } catch {}
+  function showMine() {
+    if (!mySlug) return;
+    const link = SITE + "p/" + mySlug + (lang === "en" ? "" : "?lang=" + lang);
+    $("mineLink").href = link; $("mineLink").textContent = link.replace("https://", "");
+    $("mWa").href = "https://wa.me/?text=" + encodeURIComponent(t("shareText") + " " + link);
+    $("mFb").href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link);
+    $("mX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(t("shareText")) + "&url=" + encodeURIComponent(link);
+    $("mine").hidden = false;
+  }
+  $("mCopy").onclick = async () => {
+    const link = $("mineLink").href;
+    try { await navigator.clipboard.writeText(t("shareText") + " " + link); }
+    catch { const a = document.createElement("textarea"); a.value = link; document.body.append(a); a.select(); document.execCommand("copy"); a.remove(); }
+    $("mCopy").textContent = t("copied"); setTimeout(() => { $("mCopy").textContent = t("copy_btn"); }, 2500);
+  };
+
+  // ---------- Pledge wall (only lines the owner approved) ----------
+  let wall = [];
+  const reportedIds = new Set();
+  function renderWall() {
+    const box = $("wallList"); box.replaceChildren();
+    for (const w of wall) {
+      const f = document.createElement("figure"), q = document.createElement("blockquote"), c = document.createElement("figcaption");
+      q.textContent = "“" + w.text + "”";
+      const who = document.createElement("span"); who.textContent = (w.name || t("citizen")) + (w.city ? ", " + w.city : "");
+      const b = document.createElement("button"); b.type = "button"; b.className = "rep";
+      b.textContent = reportedIds.has(w.id) ? t("reported") : t("report"); b.disabled = reportedIds.has(w.id);
+      b.onclick = () => { reportedIds.add(w.id); b.textContent = t("reported"); b.disabled = true; api("/api/wall/" + w.id + "/report", {}).catch(() => {}); };
+      c.append(who, b); f.append(q, c); box.append(f);
+    }
+    $("wall").hidden = !wall.length;
+  }
+  api("/api/wall").then(d => { wall = d.items || []; renderWall(); }).catch(() => {});
   // Typing an email/phone ticks the consent box (the person can untick it); without the tick it is not saved.
   const pf = $("pledgeForm");
   pf.contact.addEventListener("input", () => { if (pf.contact.value.trim() && !pf.contact.dataset.touched) pf.consent.checked = true; });
@@ -109,22 +184,25 @@
       const data = Object.fromEntries(new FormData(f)); data.lang = lang;
       const btn = f.querySelector("button"); btn.disabled = true; msg.className = "msg";
       try { msg.textContent = await onSubmit(data, f); msg.classList.add("ok"); }
-      catch (err) { msg.textContent = err.message && err.message !== "api" ? err.message : t("err"); msg.classList.add("bad"); }
+      catch (err) { msg.textContent = ERR[err.code] ? t(ERR[err.code]) : err.message && err.message !== "api" ? err.message : err.code && err.status === 429 ? err.code : t("err"); msg.classList.add("bad"); }
       finally { btn.disabled = false; }
     });
   };
   form("pledgeForm", "pledgeMsg", async (data, f) => {
     if (!data.city.trim()) { f.city.focus(); throw new Error(t("err_city")); }
-    const d = await api("/api/pledge", data);
+    if (!f.agree.checked) { f.agree.focus(); throw new Error(t("err_agree")); }
+    const d = await api("/api/pledge", Object.assign(data, await prove()));
     showCount(d.count); showRecent(d.recent);
     f.reset();
+    if (d.slug) { mySlug = d.slug; try { localStorage.setItem("qi_slug", d.slug); } catch {} showMine(); }
     try { localStorage.setItem("qi_pledged", "1"); } catch {}
-    setTimeout(() => $("share").scrollIntoView({ behavior: "smooth" }), 1800);
+    setTimeout(() => $("mine").scrollIntoView({ behavior: "smooth", block: "center" }), 1500);
     return t("pledge_thanks");
   });
   form("joinForm", "joinMsg", async (data, f) => {
     if (!data.message.trim()) { f.message.focus(); throw new Error(t("err_msg")); }
-    await api("/api/contact", data);
+    if (!f.agree.checked) { f.agree.focus(); throw new Error(t("err_agree")); }
+    await api("/api/contact", Object.assign(data, await prove()));
     f.reset();
     return t("sent");
   });
