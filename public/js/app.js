@@ -194,6 +194,7 @@
     </div>
     <label class="opt" for="bkSafety"><input type="checkbox" id="bkSafety" ${b.safety ? "checked" : ""}><span>${esc(tx(c.safetyCheckbox))}</span></label>
     <label class="opt" for="bkUnder"><input type="checkbox" id="bkUnder" ${b.undertake ? "checked" : ""}><span id="bkUnderText">${esc(tx(b.fareMode === "fixed" ? c.payUndertakingFixed : c.payUndertakingMeter))}</span></label>
+    <p class="note">${t("By booking you agree to the")} <a href="/terms" target="_blank" rel="noopener">${t("Terms of Use for riders")}</a>.</p>
     <button class="btn wide" id="bkGo" type="button"></button>
     <div class="err" id="bkMsg"></div>`;
   }
