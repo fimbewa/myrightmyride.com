@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 760" role="img" aria-labelledby="t d">
+<title id="t">Five steps to board a local train safely</title>
+<desc id="d">1. Wait in a line on the platform, behind the yellow line. 2. Let people get off first. 3. Board one by one, never a moving train. 4. Move inside, do not stand at the door. 5. Help the elderly, women, children and people with disabilities.</desc>
+<rect width="800" height="760" rx="28" fill="#fff"/>
+<rect width="800" height="110" rx="28" fill="#1d3557"/><rect y="70" width="800" height="40" fill="#1d3557"/>
+<text x="400" y="68" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="36" font-weight="800" fill="#fff">5 steps to board safely</text>
+<g font-family="system-ui,Segoe UI,Roboto,sans-serif">
+  <g transform="translate(0,140)"><circle cx="70" cy="50" r="34" fill="#e85d04"/><text x="70" y="62" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">1</text><text x="130" y="42" font-size="28" font-weight="700" fill="#14213d">Wait in a line</text><text x="130" y="78" font-size="22" fill="#5c6474">Stand behind the yellow line, one behind another.</text></g>
+  <g transform="translate(0,260)"><circle cx="70" cy="50" r="34" fill="#e85d04"/><text x="70" y="62" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">2</text><text x="130" y="42" font-size="28" font-weight="700" fill="#14213d">Let people get off first</text><text x="130" y="78" font-size="22" fill="#5c6474">Keep the middle of the door clear.</text></g>
+  <g transform="translate(0,380)"><circle cx="70" cy="50" r="34" fill="#e85d04"/><text x="70" y="62" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">3</text><text x="130" y="42" font-size="28" font-weight="700" fill="#14213d">Board one by one</text><text x="130" y="78" font-size="22" fill="#5c6474">Never jump on or off a moving train.</text></g>
+  <g transform="translate(0,500)"><circle cx="70" cy="50" r="34" fill="#e85d04"/><text x="70" y="62" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">4</text><text x="130" y="42" font-size="28" font-weight="700" fill="#14213d">Move inside</text><text x="130" y="78" font-size="22" fill="#5c6474">Do not hang at the door or on the footboard.</text></g>
+  <g transform="translate(0,620)"><circle cx="70" cy="50" r="34" fill="#e85d04"/><text x="70" y="62" text-anchor="middle" font-size="34" font-weight="800" fill="#fff">5</text><text x="130" y="42" font-size="28" font-weight="700" fill="#14213d">Make way for those who need it</text><text x="130" y="78" font-size="22" fill="#5c6474">Elderly, children, pregnant women, people with disabilities.</text></g>
+</g>
+</svg>

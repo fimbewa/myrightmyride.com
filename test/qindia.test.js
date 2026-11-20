@@ -37,6 +37,9 @@ test("qindiaglobal pages are served for its domain only", async () => {
   for (const p of ["/i18n.js", "/i18n-in1.js", "/i18n-in2.js", "/site.js", "/site.css", "/poster.html", "/admin", "/sitemap.xml", "/robots.txt", "/og.png", "/terms.html", "/pledge.js"]) assert.equal((await call("GET", p)).status, 200, p);
   const www = await call("GET", "/", null, { host: "www.qindiaglobal.com" });
   assert.match(www.text, /Qindiaglobal/);
+  for (const p of ["/blog/", "/blog/queue-mumbai-local", "/blog/blog.css", "/blog/blog.js", "/blog/img/rush-vs-queue.png", "/blog/img/five-steps.svg"]) assert.equal((await call("GET", p)).status, 200, p);
+  const post = await call("GET", "/blog/queue-mumbai-local");
+  assert.match(post.text, /data-t="disc"/); // the blog keeps the "not government approved" disclaimer
   const other = await call("GET", "/", null, { host: "myrightmyride.com" });
   assert.doesNotMatch(other.text, /Qindiaglobal ·/);
 });

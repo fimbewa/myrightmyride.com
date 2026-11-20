@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="t d">
+<title id="t">Rush or queue at the door of a local train</title>
+<desc id="d">Left: a crowd pushes at a train door while people try to get off, and one person slips into the gap. Right: people get off first while others wait in a single line beside the door.</desc>
+<defs>
+  <g id="p"><circle cx="0" cy="-58" r="11"/><rect x="-11" y="-45" width="22" height="45" rx="9"/></g>
+</defs>
+<rect width="1200" height="630" fill="#f4f6fa"/>
+<!-- LEFT: rush -->
+<rect x="0" y="0" width="600" height="630" fill="#fdecea"/>
+<text x="300" y="62" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="40" font-weight="800" fill="#b42318">RUSH</text>
+<text x="300" y="98" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="22" fill="#5c6474">Pushing, falls, everyone late</text>
+<!-- train -->
+<rect x="40" y="140" width="520" height="250" rx="22" fill="#8a96ab"/>
+<rect x="40" y="170" width="520" height="16" fill="#e85d04"/>
+<rect x="70" y="205" width="90" height="70" rx="8" fill="#cfd8e6"/><rect x="440" y="205" width="90" height="70" rx="8" fill="#cfd8e6"/>
+<rect x="225" y="195" width="150" height="195" rx="6" fill="#2b3446"/>
+<!-- people hanging out of door -->
+<g fill="#5c6474"><use href="#p" x="255" y="300"/><use href="#p" x="300" y="295"/><use href="#p" x="345" y="300"/><use href="#p" x="378" y="315" transform="rotate(18 378 315)"/></g>
+<!-- platform -->
+<rect x="0" y="390" width="600" height="14" fill="#14213d"/>
+<rect x="0" y="404" width="600" height="226" fill="#c8ced9"/>
+<!-- gap and falling person -->
+<rect x="190" y="390" width="220" height="14" fill="#0b0f1a"/>
+<g fill="#b42318" transform="rotate(-70 300 420)"><use href="#p" x="300" y="440"/></g>
+<!-- pushing crowd -->
+<g fill="#14213d">
+  <use href="#p" x="150" y="500" transform="rotate(14 150 500)"/><use href="#p" x="200" y="490" transform="rotate(10 200 490)"/><use href="#p" x="250" y="495" transform="rotate(16 250 495)"/>
+  <use href="#p" x="350" y="495" transform="rotate(-16 350 495)"/><use href="#p" x="400" y="490" transform="rotate(-10 400 490)"/><use href="#p" x="450" y="500" transform="rotate(-14 450 500)"/>
+  <use href="#p" x="180" y="575" transform="rotate(12 180 575)"/><use href="#p" x="240" y="570" transform="rotate(8 240 570)"/><use href="#p" x="300" y="565"/><use href="#p" x="360" y="570" transform="rotate(-8 360 570)"/><use href="#p" x="420" y="575" transform="rotate(-12 420 575)"/>
+</g>
+<g stroke="#b42318" stroke-width="6" stroke-linecap="round" fill="none"><path d="M120 455 l40 -20"/><path d="M480 455 l-40 -20"/></g>
+<circle cx="540" cy="560" r="38" fill="#b42318"/><path d="M522 542 l36 36 M558 542 l-36 36" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+<!-- RIGHT: queue -->
+<rect x="600" y="0" width="600" height="630" fill="#e7f4ec"/>
+<text x="900" y="62" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="40" font-weight="800" fill="#1b7f3b">QUEUE</text>
+<text x="900" y="98" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-size="22" fill="#5c6474">Let them off, then board in turn</text>
+<rect x="640" y="140" width="520" height="250" rx="22" fill="#8a96ab"/>
+<rect x="640" y="170" width="520" height="16" fill="#e85d04"/>
+<rect x="670" y="205" width="90" height="70" rx="8" fill="#cfd8e6"/><rect x="1040" y="205" width="90" height="70" rx="8" fill="#cfd8e6"/>
+<rect x="825" y="195" width="150" height="195" rx="6" fill="#2b3446"/>
+<rect x="600" y="390" width="600" height="14" fill="#14213d"/>
+<rect x="600" y="404" width="600" height="226" fill="#c8ced9"/>
+<!-- people getting off straight ahead -->
+<g fill="#1b7f3b"><use href="#p" x="880" y="470"/><use href="#p" x="920" y="540"/></g>
+<path d="M900 420 v130" stroke="#1b7f3b" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round"/>
+<!-- orderly line beside door -->
+<g fill="#1d3557"><use href="#p" x="800" y="470"/><use href="#p" x="775" y="520"/><use href="#p" x="750" y="570"/><use href="#p" x="725" y="620"/></g>
+<g fill="#e85d04"><use href="#p" x="825" y="420"/></g>
+<circle cx="1140" cy="560" r="38" fill="#1b7f3b"/><path d="M1120 560 l14 14 l26 -28" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="600" y1="0" x2="600" y2="630" stroke="#fff" stroke-width="6"/>
+</svg>

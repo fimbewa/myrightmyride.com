@@ -1,0 +1,31 @@
+/* Q India blog pages (list and posts). Uses the colours from /site.css. */
+.tnote{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
+.kicker{margin:18px 0 4px;color:var(--accent);font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.5px}
+.post h1,.blog-list h1{font-size:clamp(26px,6vw,38px);margin:0 0 8px}
+.meta{margin:0 0 16px;color:var(--muted);font-size:14px}
+.post h2{margin-top:30px}
+.post figure{margin:18px 0}
+.post figure img{display:block;width:100%;height:auto;border-radius:16px;border:1px solid var(--line);background:#fff}
+.post figcaption{font-size:12px;color:var(--muted);margin-top:6px}
+.steps-img img{max-width:520px;margin:0 auto}.steps-img figcaption{text-align:center}
+.lead-in{font-size:18px}
+.news{display:grid;gap:14px}
+.news article{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px}
+.news h3{margin:0 0 6px;font-size:18px;color:var(--deep)}
+.news p{margin:0 0 8px}
+.news ul{margin:0;padding-inline-start:18px;font-size:14px}.news li{margin:4px 0}
+.news a{overflow-wrap:anywhere}
+.facts li{margin:8px 0;font-size:15px}
+.small-note{font-size:13px;color:var(--muted)}
+.cons,.pros{list-style:none;padding:0;display:grid;gap:8px}
+.cons li,.pros li{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;border-inline-start:5px solid}
+.cons li{border-inline-start-color:var(--bad)}.pros li{border-inline-start-color:var(--ok)}
+.todo li{margin:6px 0}
+.cta-box{background:var(--deep);color:#fff;border-radius:18px;padding:18px;margin:26px 0}
+.cta-box .ctas{justify-content:flex-start;margin:12px 0}
+.cta-box .btn.ghost{border-color:#fff}
+.cards{display:grid;gap:14px}
+.pcard-link{display:grid;grid-template-columns:1fr;gap:0;text-decoration:none;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.pcard-link img{width:100%;height:auto;display:block}
+.pcard-link div{padding:14px 16px}.pcard-link h2{margin:0 0 6px;font-size:20px}.pcard-link p{margin:0;color:var(--muted)}
+.pcard-link span{display:inline-block;margin-top:8px;color:var(--accent);font-weight:700}
