@@ -12,6 +12,7 @@ Qindiaglobal is a citizens' initiative for orderly queues and self-discipline at
 | `poster.html` | Printable A4 posters (`?type=habits` or `?type=sign`, `&lang=hi` etc.) with a QR code to the site |
 | `admin.html` | Owner page at qindiaglobal.com/admin: pledges, messages, download as CSV. Uses the server's owner password. |
 | `og.png`, `icon-512.png`, `favicon.svg`, `qr.svg` | Share preview picture, app icon, browser icon, QR code |
+| `blog/` | The Q India Blog at qindiaglobal.com/blog. Each post is one HTML file (English); add it to `blog/index.html` and `sitemap.xml`. Pictures in `blog/img` are our own drawings. |
 | `sitemap.xml`, `robots.txt` | For Google |
 
 The pledge counter, the contact form and the owner page are run by `server/qindia.js` in the Node app and saved in the
