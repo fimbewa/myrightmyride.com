@@ -23,6 +23,9 @@ window.QI_fillSelect = function (sel) {
 };
 window.QI_T = {
   en: {
+    nav_song: "Song", songKicker: "Our discipline song", songSub: "We in a line, the nation in progress", song_play: "Play the song", song_pause: "Pause", song_resume: "Play again", song_restart: "Start over",
+    song_noaudio: "Your browser cannot play the tune, but you can read and sing the words below.",
+    songNote: "Words and tune are original, written for Qindiaglobal. They are free for everyone to sing, record, share and use, with no copyright (CC0). The tune is played by your browser, so it uses almost no data. Press Play to hear it; it never starts by itself.",
     f_wall: "A line for the Pledge wall (optional)",
     wallH: "Pledge wall",
     wallLead: "Words from people who took the pledge.",
@@ -94,6 +97,9 @@ window.QI_T = {
     tagline: "A citizens' initiative. Queue up. Board with dignity."
   },
   hi: {
+    nav_song: "गीत", songKicker: "हमारा अनुशासन गीत", songSub: "अनुशासन से आगे बढ़ता भारत", song_play: "गीत चलाएँ", song_pause: "रोकें", song_resume: "फिर चलाएँ", song_restart: "शुरू से",
+    song_noaudio: "आपका ब्राउज़र धुन नहीं चला सकता, पर आप नीचे के बोल पढ़कर गा सकते हैं।",
+    songNote: "बोल और धुन मौलिक हैं, Qindiaglobal के लिए लिखे गए। इन्हें गाने, रिकॉर्ड करने, बाँटने और उपयोग करने के लिए सभी स्वतंत्र हैं, कोई कॉपीराइट नहीं (CC0)। धुन आपका ब्राउज़र ही बजाता है, इसलिए लगभग कोई डेटा खर्च नहीं होता। सुनने के लिए Play दबाएँ, यह अपने आप शुरू नहीं होता।",
     f_wall: "संकल्प दीवार के लिए एक पंक्ति (वैकल्पिक)",
     wallH: "संकल्प दीवार",
     wallLead: "संकल्प लेने वालों के शब्द।",
@@ -165,6 +171,9 @@ window.QI_T = {
     tagline: "एक नागरिक पहल। कतार में रहें। सम्मान से सवार हों।"
   },
   mr: {
+    nav_song: "गीत", songKicker: "आमचे शिस्त गीत", songSub: "शिस्तीतून पुढे जाणारा भारत", song_play: "गीत ऐका", song_pause: "थांबवा", song_resume: "पुन्हा सुरू करा", song_restart: "सुरुवातीपासून",
+    song_noaudio: "तुमचा ब्राउझर धून वाजवू शकत नाही, पण खालील शब्द वाचून तुम्ही गाऊ शकता.",
+    songNote: "शब्द आणि धून मूळ आहेत, Qindiaglobal साठी लिहिलेले. ते गाणे, रेकॉर्ड करणे, शेअर करणे आणि वापरणे सर्वांसाठी मुक्त आहे, कोणताही कॉपीराइट नाही (CC0). धून तुमचा ब्राउझरच वाजवतो, त्यामुळे जवळजवळ डेटा लागत नाही. ऐकण्यासाठी Play दाबा, ते आपोआप सुरू होत नाही.",
     f_wall: "संकल्प भिंतीसाठी एक ओळ (ऐच्छिक)",
     wallH: "संकल्प भिंत",
     wallLead: "संकल्प केलेल्यांचे शब्द.",

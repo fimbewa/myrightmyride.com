@@ -85,3 +85,29 @@ form label.consent a{font-weight:600}
 .pcard .pledge{text-align:start}
 .pc-meta{color:var(--muted);margin:0}
 .pc-wall{font-size:18px;font-style:italic;margin:12px 0 0}
+
+/* discipline song */
+.song-card{background:linear-gradient(135deg,var(--deep),#2b4a7a);color:#fff;border-radius:20px;padding:22px 18px;text-align:center}
+.song h2{color:#fff;margin:0 0 4px;font-size:clamp(24px,6vw,32px)}
+.song-kicker{margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ffd7b5}
+.song-sub{margin:0 0 16px;color:#dfe7f5;font-size:15px}
+.song-ctl{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.song-ctl .btn.ghost{background:transparent;color:#fff;border-color:#fff}
+.song-play{display:inline-flex;align-items:center;gap:10px;font-size:18px;padding:13px 28px}
+.song-play .ico{width:0;height:0;border-style:solid;border-width:8px 0 8px 13px;border-color:transparent transparent transparent #fff}
+.song.playing .song-play .ico{width:12px;height:16px;border:0;border-inline:4px solid #fff}
+.song-play .l-pause,.song-play .l-resume,.song.playing .song-play .l-play,.song.paused .song-play .l-play{display:none}
+.song.playing .song-play .l-pause,.song.paused .song-play .l-resume{display:inline}
+.song-track{height:5px;border-radius:3px;background:rgba(255,255,255,.2);margin:16px auto 0;max-width:420px;overflow:hidden}
+.song-track i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s linear}
+.song-noaudio{display:none;margin:12px 0 0;font-size:14px}
+.song.no-audio .song-ctl,.song.no-audio .song-track{display:none}.song.no-audio .song-noaudio{display:block}
+.lyrics{position:relative;max-height:360px;overflow-y:auto;margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:6px 16px 14px;scroll-behavior:smooth}
+.lyrics .part{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.lyrics .ln{margin:0;padding:6px 10px;border-radius:10px;transition:background .3s}
+.lyrics .ln.ch .hi{color:var(--deep)}
+.lyrics .hi{display:block;font-size:18px;font-weight:700;line-height:1.5}
+.lyrics .en{display:block;font-size:14px;color:var(--muted)}
+.lyrics .ln.on{background:#fff1e6;box-shadow:inset 4px 0 0 var(--accent)}
+.song-note{margin:10px 2px 0;font-size:13px;color:var(--muted)}
+.song-ctl [hidden]{display:none}
