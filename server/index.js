@@ -18,7 +18,10 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.set("trust proxy", 1);
-app.use(express.json({ limit: "1mb" }));
+// Owner blog posts on qindiaglobal.com can be up to 250,000 characters (up to ~1 MB in Indian scripts),
+// so that one owner-only address accepts a bigger body. Everything else stays at 1 MB.
+const jsonBig = express.json({ limit: "4mb" }), jsonNormal = express.json({ limit: "1mb" });
+app.use((req, res, next) => (req.path.startsWith("/api/admin/posts") ? jsonBig : jsonNormal)(req, res, next));
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("Referrer-Policy", "strict-origin-when-cross-origin"); // map and search services need to see which site is asking
