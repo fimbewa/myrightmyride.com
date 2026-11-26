@@ -478,7 +478,7 @@
     out.onclick = async () => { await api("/api/s/logout", { body: {} }).catch(() => {}); setToken(""); me = null; badges(); go("#/"); };
     const invite = location.origin + "/community?ref=" + me.username;
     const inv = h("div", { cls: "card" }, h("label", { text: "Invite friends" }), h("p", { cls: "muted", text: "Share your own link. People who join with it are counted as invited by you." }),
-      h("p", { cls: "muted" }, "Reach 1,000 sign-ups to share in the site's ad income (no ad income means no payment). ", h("a", { href: "/referral" }, "See your progress and the rules")),
+      h("p", { cls: "muted" }, "Inviting friends is free and voluntary. Qindiaglobal pays no fee, reward or commission for invitations. ", h("a", { href: "/legal/referral" }, "Invitation rules")),
       h("p", { cls: "code", style: "font-size:15px", text: invite }),
       h("button", { cls: "sbtn main", onclick: () => navigator.share ? navigator.share({ title: "Join me on Q India Community", url: invite }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent("Join me on Q India Community: " + invite), "_blank", "noopener") }, "Share my invite link"));
     show(h("h1", { text: "Settings" }), inv,

@@ -276,7 +276,10 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));
   r.use(require("./qindia-ads")(db, { human, isBad })); // advertising: own ads + optional Google AdSense
   r.use(require("./qindia-team")(db, { human, isBad })); // Careers: volunteer / Q India Reporter applications
-  r.use(require("./qindia-referral")(db)); // referral rewards: monthly share of ad income after 1,000 sign-ups
+  // Referral rewards were withdrawn on 26 Nov 2026 (owner's decision: no fee or reward is paid for invitations).
+  // Remove their stored data, including any payment details members gave, and send old links to the invitation rules.
+  db.exec("DROP TABLE IF EXISTS q_ref_payee; DROP TABLE IF EXISTS q_ref_payouts; DROP TABLE IF EXISTS q_ref_months; DELETE FROM q_kv WHERE k LIKE 'ref\\_%' ESCAPE '\\'");
+  r.get(["/referral", "/referral.html", "/admin-referral", "/admin-referral.html"], (req, res) => res.redirect(301, "/legal/referral"));
   r.use("/api", (req, res) => bad(res, "Not found.", 404));
 
   // ---------- the website ----------

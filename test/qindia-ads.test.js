@@ -122,3 +122,13 @@ test("house ads invite people to Careers; applications reach the owner", async (
   const csv = await call("GET", "/api/admin/team.csv", null, { token });
   assert.match(csv.text, /Q India Reporter/);
 });
+
+test("no referral fee: old referral pages are gone and the rules say no reward is paid", async () => {
+  const r = await call("GET", "/referral");
+  assert.equal(r.status, 301); assert.equal(r.headers.location, "/legal/referral");
+  assert.equal((await call("GET", "/api/referral/rules")).status, 404);
+  const rules = (await call("GET", "/legal/referral")).text;
+  assert.match(rules, /does not pay any referral fee/);
+  assert.doesNotMatch(rules, /share of the ad income|PAN/);
+  assert.doesNotMatch((await call("GET", "/admin")).text, /admin-referral/);
+});
