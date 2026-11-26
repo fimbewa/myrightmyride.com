@@ -273,6 +273,8 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   r.use(require("./qindia-legal").router(db, { owner, human, ipHash, banned, limited }));
   // Q India Community: accounts, posts, feed, follow, private messages (server/qindia-social.js)
   r.use(require("./qindia-social")(db, { human, ipHash, banned, limited, owner }));
+  // Owner's "Download full backup" (server/qindia-backup.js)
+  r.use(require("./qindia-backup")(db, { owner, ipHash, limited }));
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));
   r.use(require("./qindia-ads")(db, { human, isBad })); // advertising: own ads + optional Google AdSense
   r.use("/api", (req, res) => bad(res, "Not found.", 404));

@@ -70,6 +70,17 @@
       <button class="small-btn" id="refresh">Refresh</button>
       <a class="small-btn" href="/admin-ads" style="text-decoration:none;color:var(--ink)">Ads and earnings</a>
     </div>
+    <h2 id="backup">Full backup</h2>
+    <div class="item">
+      <p>Save a copy of <b>all</b> the website's data on your phone or computer: pledges, messages, complaints, Community members, posts, comments, private messages, blog posts and photos. It downloads as one .zip file. The spreadsheets inside open in Excel.</p>
+      <p class="small-note"><b>Keep the file safe and private.</b> It has people's personal data (protected by the DPDP Act, 2023). Do not email or share it. Delete backup files older than 30 days and keep only your newest few. Passwords are not readable in it, and it cannot be used to log in.</p>
+      <div class="tools">
+        <button class="small-btn" data-backup="1">Download full backup (with photos)</button>
+        <button class="small-btn" data-backup="0">Download backup without photos (smaller)</button>
+      </div>
+      <p class="small-note" id="backupInfo"></p>
+      <div id="backupLog" class="small-note"></div>
+    </div>
     <h2 id="community">Community</h2>
     <p class="small-note">People's accounts, posts and private messages at <a href="/community" target="_blank">qindiaglobal.com/community</a>. Clean text posts show at once. Photo posts (when the switch below is on), doubtful posts and posts reported by 3 people wait here. You never see private messages, except one that the receiver reported.</p>
     <div class="stats">
@@ -186,6 +197,7 @@ async function load() {
   const names = {}; (window.QI_LANGS || []).forEach(([c, n]) => { names[c] = n; });
   fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
   loadPosts().catch(() => {});
+  loadBackup();
   loadCommunity().catch(() => {});
   loadLegal().catch(() => {});
 }
@@ -317,6 +329,26 @@ $("refresh").onclick = () => load().catch(() => {});
 document.querySelectorAll("[data-export]").forEach(b => b.onclick = async () => {
   const blob = await (await api("/api/admin/export/" + b.dataset.export)).blob();
   const a = el("a"); a.href = URL.createObjectURL(blob); a.download = "qindiaglobal-" + b.dataset.export + ".csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+// ---------- full backup ----------
+async function loadBackup() {
+  try {
+    const d = await (await api("/api/admin/backup")).json();
+    $("backupInfo").textContent = `Right now: database about ${Math.max(1, d.dbMB)} MB, ${d.photos} photo files (about ${d.photoMB} MB).`;
+    const box = $("backupLog"); box.replaceChildren();
+    if (d.log.length) box.append(el("div", null, "Last backups:"));
+    d.log.forEach(x => box.append(el("div", null, "• " + when(x.created_at) + (x.photos ? " · with photos" : " · without photos") + " · " +
+      (x.ok ? "done, " + (x.bytes / 1048576).toFixed(1) + " MB" : x.note || "not finished"))));
+  } catch {}
+}
+document.querySelectorAll("[data-backup]").forEach(b => b.onclick = async () => {
+  const info = $("backupInfo"); info.textContent = "Preparing your backup…";
+  try {
+    const d = await (await api("/api/admin/backup/start", { method: "POST", body: JSON.stringify({ photos: b.dataset.backup === "1" }) })).json();
+    location.href = d.url; // the browser saves the file in Downloads
+    info.textContent = "Your download has started. When it finishes, keep the file somewhere safe.";
+    setTimeout(loadBackup, 15000);
+  } catch (err) { if (err.message !== "login") info.textContent = err.message; }
 });
 // ---------- set a new password through GitHub ----------
 let resetCode = ""; try { resetCode = sessionStorage.getItem("qi_reset") || ""; } catch {}
