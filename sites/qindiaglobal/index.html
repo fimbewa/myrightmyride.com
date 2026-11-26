@@ -170,12 +170,7 @@
     <div class="mine" id="mine" hidden>
       <p><b data-t="my_link"></b></p>
       <p><a id="mineLink" target="_blank" rel="noopener"></a></p>
-      <div class="share">
-        <a id="mWa" class="sbtn wa" target="_blank" rel="noopener">WhatsApp</a>
-        <a id="mFb" class="sbtn fb" target="_blank" rel="noopener">Facebook</a>
-        <a id="mX" class="sbtn x" target="_blank" rel="noopener">X</a>
-        <button id="mCopy" class="sbtn" type="button" data-t="copy_btn"></button>
-      </div>
+      <div class="qshare" id="mineShare"></div>
     </div>
     <p class="recent" id="recent" hidden><b data-t="recent"></b> <span id="recentList"></span></p>
   </section>
@@ -189,14 +184,7 @@
   <section id="share" class="wrap block">
     <h2 data-t="shareH"></h2>
     <p data-t="shareLead"></p>
-    <div class="share">
-      <a id="sWa" class="sbtn wa" target="_blank" rel="noopener">WhatsApp</a>
-      <a id="sX" class="sbtn x" target="_blank" rel="noopener">X</a>
-      <a id="sFb" class="sbtn fb" target="_blank" rel="noopener">Facebook</a>
-      <a id="sTg" class="sbtn tg" target="_blank" rel="noopener">Telegram</a>
-      <button id="sCopy" class="sbtn" type="button" data-t="copy_btn"></button>
-      <button id="sMore" class="sbtn" type="button" data-t="more_btn" hidden></button>
-    </div>
+    <div class="qshare" id="siteShare"></div>
   </section>
 
   <section id="posters" class="wrap block">
@@ -255,6 +243,7 @@
 <script src="/i18n.js"></script>
 <script src="/i18n-in1.js"></script>
 <script src="/i18n-in2.js"></script>
+<script src="/share.js"></script>
 <script src="/site.js"></script>
 <script src="/song.js"></script>
 <script src="/ads.js" defer></script>

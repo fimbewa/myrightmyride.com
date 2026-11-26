@@ -34,7 +34,7 @@ test("qindiaglobal pages are served for its domain only", async () => {
   const home = await call("GET", "/");
   assert.equal(home.status, 200);
   assert.match(home.text, /Qindiaglobal/);
-  for (const p of ["/i18n.js", "/i18n-in1.js", "/i18n-in2.js", "/site.js", "/site.css", "/poster.html", "/admin", "/sitemap.xml", "/robots.txt", "/og.png", "/legal/terms", "/pledge.js"]) assert.equal((await call("GET", p)).status, 200, p);
+  for (const p of ["/i18n.js", "/i18n-in1.js", "/i18n-in2.js", "/site.js", "/site.css", "/poster.html", "/admin", "/sitemap.xml", "/robots.txt", "/og.png", "/legal/terms", "/pledge.js", "/share.js"]) assert.equal((await call("GET", p)).status, 200, p);
   const www = await call("GET", "/", null, { host: "www.qindiaglobal.com" });
   assert.match(www.text, /Qindiaglobal/);
   for (const p of ["/blog/", "/blog/queue-mumbai-local", "/blog/blog.css", "/blog/blog.js", "/blog/img/rush-vs-queue.png", "/blog/img/five-steps.svg"]) assert.equal((await call("GET", p)).status, 200, p);
