@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   // Q India Community: accounts, posts, feed, follow, private messages (server/qindia-social.js)
   r.use(require("./qindia-social")(db, { human, ipHash, banned, limited, owner }));
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));
+  r.use(require("./qindia-ads")(db, { human, isBad })); // advertising: own ads + optional Google AdSense
   r.use("/api", (req, res) => bad(res, "Not found.", 404));
 
   // ---------- the website ----------
