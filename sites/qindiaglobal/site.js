@@ -14,11 +14,7 @@
     document.querySelector('meta[name="description"]').content = t("desc");
     const link = SITE + (l === "en" ? "" : "?lang=" + l);
     document.querySelector('link[rel="canonical"]').href = link;
-    const text = t("shareText") + " " + link;
-    $("sWa").href = "https://wa.me/?text=" + encodeURIComponent(text);
-    $("sX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(t("shareText")) + "&url=" + encodeURIComponent(link);
-    $("sFb").href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link);
-    $("sTg").href = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(t("shareText"));
+    QI_SHARE.render($("siteShare"), shareOpts(link));
     $("pHabits").href = "/poster.html?type=habits&lang=" + l;
     $("pSign").href = "/poster.html?type=sign&lang=" + l;
     const u = new URL(location.href);
@@ -66,17 +62,9 @@
     }
   }
 
-  // ---------- share ----------
-  const shareLink = () => SITE + (lang === "en" ? "" : "?lang=" + lang);
-  $("sCopy").onclick = async () => {
-    try { await navigator.clipboard.writeText(t("shareText") + " " + shareLink()); }
-    catch { const a = document.createElement("textarea"); a.value = shareLink(); document.body.append(a); a.select(); document.execCommand("copy"); a.remove(); }
-    $("sCopy").textContent = t("copied");
-    setTimeout(() => { $("sCopy").textContent = t("copy_btn"); }, 2500);
-  };
-  if (navigator.share) {
-    $("sMore").hidden = false;
-    $("sMore").onclick = () => navigator.share({ title: "Qindiaglobal", text: t("shareText"), url: shareLink() }).catch(() => {});
+  // ---------- share (buttons drawn by share.js) ----------
+  function shareOpts(url) {
+    return { url, text: t("shareText"), title: "Qindiaglobal", copyLabel: t("copy_btn"), copiedLabel: t("copied"), moreLabel: t("more_btn") };
   }
 
   // ---------- pledge counter ----------
@@ -142,17 +130,9 @@
     if (!mySlug) return;
     const link = SITE + "p/" + mySlug + (lang === "en" ? "" : "?lang=" + lang);
     $("mineLink").href = link; $("mineLink").textContent = link.replace("https://", "");
-    $("mWa").href = "https://wa.me/?text=" + encodeURIComponent(t("shareText") + " " + link);
-    $("mFb").href = "https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(link);
-    $("mX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(t("shareText")) + "&url=" + encodeURIComponent(link);
+    QI_SHARE.render($("mineShare"), Object.assign(shareOpts(link), { note: false }));
     $("mine").hidden = false;
   }
-  $("mCopy").onclick = async () => {
-    const link = $("mineLink").href;
-    try { await navigator.clipboard.writeText(t("shareText") + " " + link); }
-    catch { const a = document.createElement("textarea"); a.value = link; document.body.append(a); a.select(); document.execCommand("copy"); a.remove(); }
-    $("mCopy").textContent = t("copied"); setTimeout(() => { $("mCopy").textContent = t("copy_btn"); }, 2500);
-  };
 
   // ---------- Pledge wall (only lines the owner approved) ----------
   let wall = [];

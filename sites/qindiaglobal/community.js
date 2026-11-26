@@ -252,10 +252,9 @@
     };
     const link = location.origin + "/community#/p/" + p.id;
     const share = h("button", { type: "button" }, "↗ Share");
-    share.onclick = async () => {
+    share.onclick = () => {
       const text = (p.text || "A post on Q India Community").slice(0, 100);
-      if (navigator.share) return navigator.share({ title: "Q India Community", text, url: link }).catch(() => {});
-      window.open("https://wa.me/?text=" + encodeURIComponent(text + " " + link), "_blank", "noopener");
+      QI_SHARE.popup({ url: link, text, title: "Q India Community", heading: "Share this post" });
     };
     const head = h("div", { cls: "row ph" }, whoLink(p.user, ago(p.created_at)));
     menu(head, [
@@ -477,10 +476,11 @@
     const out = h("button", { cls: "sbtn" }, "Log out");
     out.onclick = async () => { await api("/api/s/logout", { body: {} }).catch(() => {}); setToken(""); me = null; badges(); go("#/"); };
     const invite = location.origin + "/community?ref=" + me.username;
+    const invBar = h("div", { cls: "qshare" });
     const inv = h("div", { cls: "card" }, h("label", { text: "Invite friends" }), h("p", { cls: "muted", text: "Share your own link and invite friends and family to join the queue movement." }),
       h("p", { cls: "muted" }, "Every friend you bring is one more person who queues with dignity, and inspires others to do the same. Inviting is voluntary; Qindiaglobal pays no fee, reward or commission for invitations. ", h("a", { href: "/legal/referral" }, "Why inviting matters")),
-      h("p", { cls: "code", style: "font-size:15px", text: invite }),
-      h("button", { cls: "sbtn main", onclick: () => navigator.share ? navigator.share({ title: "Join me on Q India Community", url: invite }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent("Join me on Q India Community: " + invite), "_blank", "noopener") }, "Share my invite link"));
+      h("p", { cls: "code", style: "font-size:15px", text: invite }), invBar);
+    QI_SHARE.render(invBar, { url: invite, text: "Join me on Q India Community, where citizens queue up and board with dignity. It is free:", title: "Join me on Q India Community" });
     show(h("h1", { text: "Settings" }), inv,
       h("div", { cls: "card" }, h("label", { text: "Who can message me" }), dm, dmMsg),
       h("div", { cls: "card" }, h("label", { text: "Password" }), pf),
