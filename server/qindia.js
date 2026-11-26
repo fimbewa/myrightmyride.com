@@ -4,6 +4,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const fs = require("fs");
 const ownerPassword = require("./owner-password");
 const { humanCheck, isBad, isDoubtful } = require("./qindia-safety");
 
@@ -227,6 +228,47 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     const csv = [cols.join(","), ...rows.map(row => cols.map(c => c === "created_at" ? cell(new Date(row[c]).toISOString()) : cell(row[c])).join(","))].join("\r\n");
     res.set("Content-Type", "text/csv; charset=utf-8").set("Content-Disposition", `attachment; filename="qindiaglobal-${req.params.what === "messages" ? "messages" : "pledges"}.csv"`).send("﻿" + csv);
   });
+  // ---------- owner blog posts (written on the owner page, shown at /blog/) ----------
+  // The owner can write long posts: up to 250,000 characters of text. Visitors' forms keep their small limits.
+  const POST_MAX = 250000, TITLE_MAX = 200;
+  db.exec(`CREATE TABLE IF NOT EXISTS q_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, body TEXT NOT NULL,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`);
+  const chars = s => [...String(s ?? "")].length; // counts each letter/emoji once, like a person would
+  const postText = s => String(s ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, " ").trim();
+  const postSlug = title => {
+    let base = String(title).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+    if (base.length < 3) base = "post";
+    let slug = base, i = 2;
+    const taken = x => !!db.prepare("SELECT 1 FROM q_posts WHERE slug = ?").get(x) || fs.existsSync(path.join(DIR, "blog", x + ".html")) || ["index", "img", "blog"].includes(x);
+    while (taken(slug)) slug = base + "-" + i++;
+    return slug;
+  };
+  function readPost(req, res) {
+    const b = req.body || {}, title = clean(b.title, TITLE_MAX * 2), body = postText(b.body);
+    if (!title) { bad(res, "Please write a title."); return null; }
+    if (chars(title) > TITLE_MAX) { bad(res, `The title can be at most ${TITLE_MAX} characters.`); return null; }
+    if (!body) { bad(res, "Please write the post."); return null; }
+    if (chars(body) > POST_MAX) { bad(res, `The post is ${chars(body).toLocaleString("en-IN")} characters. The most allowed is 2,50,000.`, 413); return null; }
+    return { title, body };
+  }
+  r.get("/api/admin/posts", owner, (req, res) => {
+    res.json({ max: POST_MAX, posts: db.prepare("SELECT id, slug, title, body, created_at, updated_at FROM q_posts ORDER BY id DESC").all() });
+  });
+  r.post("/api/admin/posts", owner, (req, res) => {
+    const p = readPost(req, res); if (!p) return;
+    const slug = postSlug(p.title), t = now();
+    db.prepare("INSERT INTO q_posts(slug, title, body, created_at, updated_at) VALUES(?,?,?,?,?)").run(slug, p.title, p.body, t, t);
+    res.json({ ok: true, slug, url: "/blog/" + slug, chars: chars(p.body) });
+  });
+  r.post("/api/admin/posts/:id", owner, (req, res) => {
+    const id = Number(req.params.id), row = db.prepare("SELECT slug FROM q_posts WHERE id = ?").get(id);
+    if (!row) return bad(res, "Not found.", 404);
+    if ((req.body || {}).action === "delete") { db.prepare("DELETE FROM q_posts WHERE id = ?").run(id); return res.json({ ok: true }); }
+    const p = readPost(req, res); if (!p) return;
+    db.prepare("UPDATE q_posts SET title = ?, body = ?, updated_at = ? WHERE id = ?").run(p.title, p.body, now(), id);
+    res.json({ ok: true, slug: row.slug, url: "/blog/" + row.slug, chars: chars(p.body) });
+  });
   r.use("/api", (req, res) => bad(res, "Not found.", 404));
 
   // ---------- the website ----------
@@ -237,7 +279,6 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   });
   // Personal pledge page: qindiaglobal.com/p/<code>. Not listed for search engines; only people given the link see it.
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  const fs = require("fs");
   let pageTpl = null;
   r.get("/p/:slug", (req, res, next) => {
     const row = /^[a-z0-9]{6,16}$/.test(req.params.slug) && db.prepare("SELECT * FROM q_pledges WHERE slug = ?").get(req.params.slug);
@@ -253,6 +294,42 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     };
     res.set("Cache-Control", "no-cache").type("html").send(pageTpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vals ? esc(vals[k]) : m)));
   });
+
+  // Owner-written blog posts: the text is escaped, then simple marks become HTML:
+  // a blank line starts a new paragraph, "# " / "## " start a heading, "- " starts a list item, web links become links.
+  const linkify = t => t.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)'"&]/g, u => `<a href="${u}" target="_blank" rel="noopener nofollow ugc">${u}</a>`);
+  function renderPost(body) {
+    return esc(body).split(/\n{2,}/).map(block => {
+      const lines = block.split("\n");
+      if (lines.every(l => /^\s*[-*•] /.test(l))) return "<ul>" + lines.map(l => "<li>" + linkify(l.replace(/^\s*[-*•] /, "")) + "</li>").join("") + "</ul>";
+      const out = []; let para = [];
+      const flush = () => { if (para.length) out.push("<p>" + linkify(para.join("<br>")) + "</p>"); para = []; };
+      for (const l of lines) {
+        const h = /^(#{1,3}) +(.+)$/.exec(l);
+        if (h) { flush(); out.push(h[1].length === 1 ? `<h2>${linkify(h[2])}</h2>` : `<h3>${linkify(h[2])}</h3>`); } else para.push(l);
+      }
+      flush(); return out.join("\n");
+    }).join("\n");
+  }
+  const longDate = ms => new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  const summary = body => { const t = body.replace(/^(#+|\s*[-*•]) +/gm, "").replace(/\s+/g, " ").trim(); const c = [...t]; return c.length > 160 ? c.slice(0, 157).join("") + "…" : t; };
+  let postTpl = null, blogIndex = null;
+  r.get(["/blog", "/blog/", "/blog/index", "/blog/index.html"], (req, res, next) => {
+    if (req.path === "/blog") return res.redirect(301, "/blog/");
+    if (!blogIndex) blogIndex = fs.readFileSync(path.join(DIR, "blog", "index.html"), "utf8");
+    const cards = db.prepare("SELECT slug, title, body, created_at FROM q_posts ORDER BY id DESC").all().map(p =>
+      `<a class="pcard-link" href="/blog/${esc(p.slug)}"><div><h2>${esc(p.title)}</h2><p>${esc(summary(p.body))} ${esc(longDate(p.created_at))}.</p><span>Read the post →</span></div></a>`).join("\n    ");
+    res.set("Cache-Control", "no-cache").type("html").send(blogIndex.replace("<!--OWNER_POSTS-->", cards));
+  });
+  r.get("/blog/:slug", (req, res, next) => {
+    const row = /^[a-z0-9-]{3,80}$/.test(req.params.slug) && db.prepare("SELECT * FROM q_posts WHERE slug = ?").get(req.params.slug);
+    if (!row) return next();
+    if (!postTpl) postTpl = fs.readFileSync(path.join(DIR, "blog", "post-page.html"), "utf8");
+    const words = String(row.body).split(/\s+/).filter(Boolean).length;
+    const vals = { SLUG: row.slug, TITLE: row.title, DESC: summary(row.body), DATE: longDate(row.created_at), ISODATE: new Date(row.created_at).toISOString().slice(0, 10), MINUTES: String(Math.max(1, Math.round(words / 200))) };
+    res.set("Cache-Control", "no-cache").type("html").send(postTpl.replace(/\{\{(\w+)\}\}/g, (m, k) => (k === "BODY" ? renderPost(row.body) : k in vals ? esc(vals[k]) : m)));
+  });
+  r.get(["/blog/post-page", "/blog/post-page.html"], (req, res) => res.redirect("/blog/")); // the template itself is not a page
 
   r.get(["/pledge-page", "/pledge-page.html"], (req, res) => res.redirect("/")); // the template itself is not a page
   r.use(express.static(DIR, { index: "index.html", extensions: ["html"] }));

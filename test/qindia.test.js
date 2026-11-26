@@ -178,3 +178,36 @@ test("personal pledge page and Pledge wall: clean lines show at once, doubtful o
   await call("POST", "/api/admin/unban-all", {}, { token });
   assert.notEqual((await pledge({ city: "Mumbai" })).status, 403, "unblocked again");
 });
+
+test("owner can publish blog posts up to 250,000 characters", async () => {
+  assert.equal((await call("POST", "/api/admin/posts", { title: "x", body: "y" })).status, 401);
+  const { token } = (await call("POST", "/api/admin/login", { password: "brandnew123" })).data;
+  // 250,000 characters in Devanagari is about 750 KB, near the old 1 MB body limit, so test that too.
+  const head = "# Queue first\n\nलाइन में खड़े रहें। ", tail = "\n\n- one https://example.com/a?b=1&c=2\n- two <script>alert(1)</script>";
+  const long = head + "क".repeat(250000 - [...head].length - [...tail].length) + tail;
+  assert.equal([...long].length, 250000);
+  const ok = await call("POST", "/api/admin/posts", { title: "Queue first, always", body: long }, { token });
+  assert.equal(ok.status, 200, ok.text);
+  assert.equal(ok.data.url, "/blog/queue-first-always");
+  const page = await call("GET", "/blog/queue-first-always");
+  assert.equal(page.status, 200);
+  assert.match(page.text, /<h1>Queue first, always<\/h1>/);
+  assert.match(page.text, /<h2>Queue first<\/h2>/);
+  assert.match(page.text, /<li>one <a href="https:\/\/example.com\/a\?b=1&amp;c=2"/);
+  assert.doesNotMatch(page.text, /<script>alert/);
+  assert.match(page.text, /data-t="disc"/);
+  assert.match((await call("GET", "/blog/")).text, /href="\/blog\/queue-first-always"/);
+  assert.equal((await call("GET", "/blog/queue-mumbai-local")).status, 200); // the older post still works
+  const tooLong = await call("POST", "/api/admin/posts", { title: "Too long", body: "a".repeat(250001) }, { token });
+  assert.equal(tooLong.status, 413);
+  const list = (await call("GET", "/api/admin/posts", null, { token })).data;
+  assert.equal(list.max, 250000);
+  const id = list.posts[0].id;
+  assert.equal((await call("POST", `/api/admin/posts/${id}`, { title: "New title", body: "Short now." }, { token })).status, 200);
+  assert.match((await call("GET", "/blog/queue-first-always")).text, /New title/);
+  await call("POST", `/api/admin/posts/${id}`, { action: "delete" }, { token });
+  assert.equal((await call("GET", "/blog/queue-first-always")).status, 200); // falls back to the home page, like other unknown pages
+  assert.doesNotMatch((await call("GET", "/blog/")).text, /queue-first-always/);
+  // Visitor forms keep their small limits against spam.
+  assert.equal((await call("POST", "/api/contact", { message: "a".repeat(1_100_000) })).status, 413);
+});

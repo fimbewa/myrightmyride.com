@@ -21,6 +21,8 @@
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .small-note{font-size:13px;color:var(--muted);margin:0 0 12px}
 .tbl th{text-align:start;padding:8px 10px;background:var(--bg);font-size:12px;color:var(--muted)}
+#postForm textarea{min-height:320px;font:inherit;line-height:1.5}
+.count{font-size:13px;color:var(--muted);margin:4px 0 10px}.count.over{color:var(--bad);font-weight:700}
 .small-btn{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
 </style>
 </head>
@@ -67,6 +69,17 @@
       <button class="small-btn" data-export="messages">Download messages (Excel/CSV)</button>
       <button class="small-btn" id="refresh">Refresh</button>
     </div>
+    <h2 id="write">Write a blog post</h2>
+    <p class="small-note">Your post goes on qindiaglobal.com/blog at once when you tap <b>Publish</b>. You can write up to <b>2,50,000 characters</b> (any language). Leave an empty line between paragraphs. Start a line with <b>#</b> and a space for a heading, or <b>-</b> and a space for a list. Web links become clickable.</p>
+    <form id="postForm">
+      <input name="title" placeholder="Title of the post" maxlength="200" required>
+      <textarea name="body" placeholder="Write your post here" required></textarea>
+      <p class="count" id="postCount">0 / 2,50,000 characters</p>
+      <div class="tools"><button class="btn" id="postSave">Publish</button><button type="button" class="small-btn" id="postCancel" hidden>Cancel editing</button></div>
+      <p class="msg" id="postMsg"></p>
+    </form>
+    <h2>Your posts</h2>
+    <div id="postList"></div>
     <h2>Pledge wall</h2>
     <p class="small-note">Lines that pass the safety filters show on the website at once. Doubtful lines (capitals, symbols, angry, political or religious words, or from a sender who was reported before) wait here until you tap <b>Approve</b>. <b>Hide</b> takes a line off. <b>Block</b> hides it and stops that sender from posting again. Lines reported 3 times come back here as "waiting".</p>
     <div id="wallItems"></div>
@@ -136,6 +149,7 @@ async function load() {
   allPledges = d.latestPledges; drawPledges();
   const names = {}; (window.QI_LANGS || []).forEach(([c, n]) => { names[c] = n; });
   fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
+  loadPosts().catch(() => {});
 }
 $("loginForm").onsubmit = async e => {
   e.preventDefault(); $("loginMsg").textContent = "";
@@ -154,6 +168,43 @@ function drawPledges() {
   rows.forEach(r => { const tr = el("tr"); [String(r.id), when(r.created_at), r.name || "", r.city || "", r.country || "", r.contact || ""].forEach(c => tr.append(el("td", null, c))); tbl.append(tr); });
   if (!rows.length) { const tr = el("tr"); const td = el("td", null, allPledges.length ? "No match." : "No pledges yet."); td.colSpan = 6; tr.append(td); tbl.append(tr); }
 }
+// ---------- owner blog posts ----------
+const POST_MAX = 250000, nf = n => n.toLocaleString("en-IN");
+const charCount = s => [...s].length;
+let editing = null;
+function countPost() {
+  const n = charCount($("postForm").elements.body.value), c = $("postCount");
+  c.textContent = nf(n) + " / " + nf(POST_MAX) + " characters" + (n > POST_MAX ? " (too long by " + nf(n - POST_MAX) + ")" : "");
+  c.classList.toggle("over", n > POST_MAX); $("postSave").disabled = n > POST_MAX;
+}
+$("postForm").elements.body.oninput = countPost;
+function editDone() { editing = null; $("postForm").reset(); $("postSave").textContent = "Publish"; $("postCancel").hidden = true; countPost(); }
+$("postCancel").onclick = editDone;
+async function loadPosts() {
+  const d = await (await api("/api/admin/posts")).json(), box = $("postList"); box.replaceChildren();
+  if (!d.posts.length) box.append(el("p", null, "No posts written here yet."));
+  d.posts.forEach(p => {
+    const it = el("div", "item");
+    it.append(el("div", "meta", when(p.created_at) + " · " + nf(charCount(p.body)) + " characters"));
+    const a = el("a", null, p.title); a.href = "/blog/" + p.slug; a.target = "_blank"; it.append(a);
+    const tools = el("div", "tools");
+    const ed = el("button", "small-btn", "Edit");
+    ed.onclick = () => { editing = p.id; const f = $("postForm"); f.elements.title.value = p.title; f.elements.body.value = p.body; $("postSave").textContent = "Save changes"; $("postCancel").hidden = false; countPost(); $("write").scrollIntoView(); };
+    const del = el("button", "small-btn", "Delete");
+    del.onclick = async () => { if (del.dataset.sure) { await api("/api/admin/posts/" + p.id, { method: "POST", body: JSON.stringify({ action: "delete" }) }); if (editing === p.id) editDone(); loadPosts(); } else { del.dataset.sure = "1"; del.textContent = "Tap again to delete"; } };
+    tools.append(ed, del); it.append(tools); box.append(it);
+  });
+}
+$("postForm").onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, msg = $("postMsg"); msg.className = "msg"; msg.textContent = "Saving…";
+  if (charCount(f.elements.body.value) > POST_MAX) { msg.textContent = "The post is too long."; msg.classList.add("bad"); return; }
+  try {
+    const d = await (await api("/api/admin/posts" + (editing ? "/" + editing : ""), { method: "POST", body: JSON.stringify({ title: f.elements.title.value, body: f.elements.body.value }) })).json();
+    msg.replaceChildren("Done. ", Object.assign(el("a", null, "Open the post"), { href: d.url, target: "_blank" }));
+    editDone(); loadPosts();
+  } catch (err) { msg.textContent = err.message; msg.classList.add("bad"); }
+};
 $("search").oninput = drawPledges;
 $("logout").onclick = () => show(false);
 $("refresh").onclick = () => load().catch(() => {});
