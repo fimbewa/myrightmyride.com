@@ -36,6 +36,7 @@ test("pages and files for ads are served", async () => {
     assert.match(t, /src="\/ads\.js"/, p);
   }
   assert.match((await call("GET", "/legal/cookies")).text, /AdSense/);
+  assert.match((await call("GET", "/legal/terms")).text, /AdSense/);
   assert.equal((await call("GET", "/ads.txt")).status, 404); // no publisher ID yet
 });
 
