@@ -35,3 +35,6 @@
 .post-body ul{padding-inline-start:22px}.post-body li{margin:8px 0}
 .post-body h2{margin:34px 0 10px;line-height:1.3}.post-body h3{margin:24px 0 8px}
 .post-body a{overflow-wrap:anywhere;font-weight:600}
+/* Links inside posts are blue and underlined, so readers can see they open. Buttons keep their own look. */
+.post a:not(.btn):not(.sbtn),.post a:not(.btn):not(.sbtn):visited{color:#0b57d0;text-decoration:underline;text-underline-offset:3px}
+.post a:not(.btn):not(.sbtn):hover{color:#083e94}
