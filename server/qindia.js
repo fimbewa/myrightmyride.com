@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   r.use(require("./qindia-social")(db, { human, ipHash, banned, limited, owner }));
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));
   r.use(require("./qindia-ads")(db, { human, isBad })); // advertising: own ads + optional Google AdSense
+  r.use(require("./qindia-team")(db, { human, isBad })); // Careers: volunteer / Q India Reporter applications
   r.use("/api", (req, res) => bad(res, "Not found.", 404));
 
   // ---------- the website ----------
@@ -303,7 +304,14 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
 
   // Owner-written blog posts: the text is escaped, then simple marks become HTML:
   // a blank line starts a new paragraph, "# " / "## " start a heading, "- " starts a list item, web links become links.
-  const linkify = t => t.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)'"&]/g, u => `<a href="${u}" target="_blank" rel="noopener nofollow ugc">${u}</a>`);
+  // "[Short title](https://...)" shows the short title as the link, so long news addresses don't fill the page.
+  const aTag = (u, text) => `<a href="${u}" target="_blank" rel="noopener nofollow ugc">${text}</a>`;
+  const linkify = t => {
+    const named = [];
+    t = t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s<)]+)\)/g, (m, text, u) => `\u0000${named.push(aTag(u, text)) - 1}\u0000`);
+    t = t.replace(/https?:\/\/[^\s<\u0000]+[^\s<\u0000.,;:!?)'"&]/g, u => aTag(u, u));
+    return t.replace(/\u0000(\d+)\u0000/g, (m, i) => named[i]);
+  };
   function renderPost(body) {
     return esc(body).split(/\n{2,}/).map(block => {
       const lines = block.split("\n");
@@ -318,7 +326,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     }).join("\n");
   }
   const longDate = ms => new Date(ms).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-  const summary = body => { const t = body.replace(/^(#+|\s*[-*•]) +/gm, "").replace(/\s+/g, " ").trim(); const c = [...t]; return c.length > 160 ? c.slice(0, 157).join("") + "…" : t; };
+  const summary = body => { const t = body.replace(/\[([^\]\n]+)\]\(https?:\/\/[^\s)]+\)/g, "$1").replace(/^(#+|\s*[-*•]) +/gm, "").replace(/\s+/g, " ").trim(); const c = [...t]; return c.length > 160 ? c.slice(0, 157).join("") + "…" : t; };
   let postTpl = null, blogIndex = null;
   r.get(["/blog", "/blog/", "/blog/index", "/blog/index.html"], (req, res, next) => {
     if (req.path === "/blog") return res.redirect(301, "/blog/");

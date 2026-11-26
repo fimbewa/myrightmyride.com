@@ -23,6 +23,9 @@ window.QI_fillSelect = function (sel) {
 };
 window.QI_T = {
   en: {
+    nav_song: "Song", songKicker: "Our discipline song", songSub: "We in a line, the nation in progress", song_play: "Play the song", song_pause: "Pause", song_resume: "Play again", song_restart: "Start over",
+    song_noaudio: "Your browser cannot play the tune, but you can read and sing the words below.",
+    songNote: "Words and tune are original, written for Qindiaglobal. They are free for everyone to sing, record, share and use, with no copyright (CC0). The tune is played by your browser, so it uses almost no data. Press Play to hear it; it never starts by itself.",
     f_wall: "A line for the Pledge wall (optional)",
     wallH: "Pledge wall",
     wallLead: "Words from people who took the pledge.",
@@ -51,7 +54,7 @@ window.QI_T = {
     photo: "Photo",
     title: "Qindiaglobal · Queue up. Board with dignity.",
     desc: "A citizens' initiative for orderly queues and self-discipline at every place in public transport. Take the pledge, share it and print free posters.",
-    nav_pledge: "Pledge", nav_habits: "Habits", nav_posters: "Posters", nav_join: "Join us", nav_blog: "Blog", nav_community: "Community",
+    nav_pledge: "Pledge", nav_habits: "Habits", nav_posters: "Posters", nav_join: "Join us", nav_blog: "Blog", nav_careers: "Careers", nav_community: "Community",
     h1: "Queue up. Board with dignity.",
     lead: "A citizens' initiative for self-discipline at every place in public transport. No pushing, no rushing, no crowding at the door. Everyone waits in line and everyone gets on.",
     cta_pledge: "Take the pledge", cta_share: "Share",
@@ -94,6 +97,9 @@ window.QI_T = {
     tagline: "A citizens' initiative. Queue up. Board with dignity."
   },
   hi: {
+    nav_song: "गीत", songKicker: "हमारा अनुशासन गीत", songSub: "अनुशासन से आगे बढ़ता भारत", song_play: "गीत चलाएँ", song_pause: "रोकें", song_resume: "फिर चलाएँ", song_restart: "शुरू से",
+    song_noaudio: "आपका ब्राउज़र धुन नहीं चला सकता, पर आप नीचे के बोल पढ़कर गा सकते हैं।",
+    songNote: "बोल और धुन मौलिक हैं, Qindiaglobal के लिए लिखे गए। इन्हें गाने, रिकॉर्ड करने, बाँटने और उपयोग करने के लिए सभी स्वतंत्र हैं, कोई कॉपीराइट नहीं (CC0)। धुन आपका ब्राउज़र ही बजाता है, इसलिए लगभग कोई डेटा खर्च नहीं होता। सुनने के लिए Play दबाएँ, यह अपने आप शुरू नहीं होता।",
     f_wall: "संकल्प दीवार के लिए एक पंक्ति (वैकल्पिक)",
     wallH: "संकल्प दीवार",
     wallLead: "संकल्प लेने वालों के शब्द।",
@@ -122,7 +128,7 @@ window.QI_T = {
     photo: "फ़ोटो",
     title: "Qindiaglobal · कतार में रहें। सम्मान से सवार हों।",
     desc: "सार्वजनिक परिवहन की हर जगह पर कतार और आत्म-अनुशासन के लिए एक नागरिक पहल। संकल्प लें, साझा करें और मुफ़्त पोस्टर छापें।",
-    nav_pledge: "संकल्प", nav_habits: "आदतें", nav_posters: "पोस्टर", nav_join: "जुड़ें", nav_blog: "ब्लॉग", nav_community: "समुदाय",
+    nav_pledge: "संकल्प", nav_habits: "आदतें", nav_posters: "पोस्टर", nav_join: "जुड़ें", nav_blog: "ब्लॉग", nav_careers: "करियर", nav_community: "समुदाय",
     h1: "कतार में रहें। सम्मान से सवार हों।",
     lead: "सार्वजनिक परिवहन की हर जगह पर आत्म-अनुशासन के लिए एक नागरिक पहल। न धक्का, न भागदौड़, न दरवाज़े पर भीड़। सब कतार में इंतज़ार करें और सब सवार हों।",
     cta_pledge: "संकल्प लें", cta_share: "साझा करें",
@@ -165,6 +171,9 @@ window.QI_T = {
     tagline: "एक नागरिक पहल। कतार में रहें। सम्मान से सवार हों।"
   },
   mr: {
+    nav_song: "गीत", songKicker: "आमचे शिस्त गीत", songSub: "शिस्तीतून पुढे जाणारा भारत", song_play: "गीत ऐका", song_pause: "थांबवा", song_resume: "पुन्हा सुरू करा", song_restart: "सुरुवातीपासून",
+    song_noaudio: "तुमचा ब्राउझर धून वाजवू शकत नाही, पण खालील शब्द वाचून तुम्ही गाऊ शकता.",
+    songNote: "शब्द आणि धून मूळ आहेत, Qindiaglobal साठी लिहिलेले. ते गाणे, रेकॉर्ड करणे, शेअर करणे आणि वापरणे सर्वांसाठी मुक्त आहे, कोणताही कॉपीराइट नाही (CC0). धून तुमचा ब्राउझरच वाजवतो, त्यामुळे जवळजवळ डेटा लागत नाही. ऐकण्यासाठी Play दाबा, ते आपोआप सुरू होत नाही.",
     f_wall: "संकल्प भिंतीसाठी एक ओळ (ऐच्छिक)",
     wallH: "संकल्प भिंत",
     wallLead: "संकल्प केलेल्यांचे शब्द.",
@@ -193,7 +202,7 @@ window.QI_T = {
     photo: "फोटो",
     title: "Qindiaglobal · रांगेत राहा. सन्मानाने प्रवास करा.",
     desc: "सार्वजनिक वाहतुकीच्या प्रत्येक ठिकाणी रांग आणि स्वयंशिस्तीसाठी नागरिकांचा उपक्रम. संकल्प करा, शेअर करा आणि मोफत पोस्टर छापा.",
-    nav_pledge: "संकल्प", nav_habits: "सवयी", nav_posters: "पोस्टर", nav_join: "सहभागी व्हा", nav_blog: "ब्लॉग", nav_community: "समुदाय",
+    nav_pledge: "संकल्प", nav_habits: "सवयी", nav_posters: "पोस्टर", nav_join: "सहभागी व्हा", nav_blog: "ब्लॉग", nav_careers: "करिअर", nav_community: "समुदाय",
     h1: "रांगेत राहा. सन्मानाने प्रवास करा.",
     lead: "सार्वजनिक वाहतुकीच्या प्रत्येक ठिकाणी स्वयंशिस्तीसाठी नागरिकांचा उपक्रम. धक्काबुक्की नाही, घाई नाही, दारात गर्दी नाही. सगळे रांगेत थांबतात आणि सगळे चढतात.",
     cta_pledge: "संकल्प करा", cta_share: "शेअर करा",
@@ -236,6 +245,7 @@ window.QI_T = {
     tagline: "नागरिकांचा उपक्रम. रांगेत राहा. सन्मानाने प्रवास करा."
   },
   gu: {
+    nav_song: "ગીત", songKicker: "અમારું શિસ્ત ગીત", songSub: "શિસ્તથી આગળ વધતું ભારત", song_play: "ગીત વગાડો", song_pause: "થોભો", song_resume: "ફરી વગાડો", song_restart: "શરૂઆતથી", song_noaudio: "તમારું બ્રાઉઝર ધૂન વગાડી શકતું નથી, પણ નીચેના શબ્દો વાંચીને તમે ગાઈ શકો છો.", songNote: "શબ્દો અને ધૂન મૌલિક છે અને સૌ માટે મફત છે, કોઈ કૉપિરાઇટ નથી (CC0). ધૂન તમારું બ્રાઉઝર જ વગાડે છે અને Play દબાવો ત્યારે જ શરૂ થાય છે.",
     f_wall: "સંકલ્પ દીવાલ માટે એક લીટી (વૈકલ્પિક)",
     wallH: "સંકલ્પ દીવાલ",
     wallLead: "સંકલ્પ લેનારાઓના શબ્દો.",
@@ -264,7 +274,7 @@ window.QI_T = {
     photo: "ફોટો",
     title: "Qindiaglobal · કતારમાં રહો. સન્માનથી સવાર થાઓ.",
     desc: "જાહેર પરિવહનની દરેક જગ્યાએ કતાર અને આત્મશિસ્ત માટે નાગરિકોની પહેલ. સંકલ્પ લો, શેર કરો અને મફત પોસ્ટર છાપો.",
-    nav_pledge: "સંકલ્પ", nav_habits: "ટેવો", nav_posters: "પોસ્ટર", nav_join: "જોડાઓ", nav_blog: "બ્લોગ", nav_community: "સમુદાય",
+    nav_pledge: "સંકલ્પ", nav_habits: "ટેવો", nav_posters: "પોસ્ટર", nav_join: "જોડાઓ", nav_blog: "બ્લોગ", nav_careers: "કારકિર્દી", nav_community: "સમુદાય",
     h1: "કતારમાં રહો. સન્માનથી સવાર થાઓ.",
     lead: "જાહેર પરિવહનની દરેક જગ્યાએ આત્મશિસ્ત માટે નાગરિકોની પહેલ. ધક્કામુક્કી નહીં, દોડધામ નહીં, દરવાજે ભીડ નહીં. બધા કતારમાં રાહ જુએ અને બધા સવાર થાય.",
     cta_pledge: "સંકલ્પ લો", cta_share: "શેર કરો",
@@ -307,6 +317,7 @@ window.QI_T = {
     tagline: "નાગરિકોની પહેલ. કતારમાં રહો. સન્માનથી સવાર થાઓ."
   },
   bn: {
+    nav_song: "গান", songKicker: "আমাদের শৃঙ্খলার গান", songSub: "শৃঙ্খলায় এগিয়ে চলা ভারত", song_play: "গান চালান", song_pause: "থামান", song_resume: "আবার চালান", song_restart: "শুরু থেকে", song_noaudio: "আপনার ব্রাউজার সুর বাজাতে পারছে না, তবে নিচের কথাগুলো পড়ে আপনি গাইতে পারেন।", songNote: "কথা ও সুর মৌলিক এবং সবার জন্য বিনামূল্যে, কোনো কপিরাইট নেই (CC0)। সুরটি আপনার ব্রাউজারই বাজায় এবং Play চাপলে তবেই শুরু হয়।",
     f_wall: "অঙ্গীকার দেয়ালের জন্য একটি লাইন (ঐচ্ছিক)",
     wallH: "অঙ্গীকার দেয়াল",
     wallLead: "যাঁরা অঙ্গীকার করেছেন তাঁদের কথা।",
@@ -335,7 +346,7 @@ window.QI_T = {
     photo: "ছবি",
     title: "Qindiaglobal · লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।",
     desc: "গণপরিবহনের প্রতিটি জায়গায় সারিবদ্ধ লাইন ও আত্মশৃঙ্খলার জন্য নাগরিকদের উদ্যোগ। অঙ্গীকার করুন, শেয়ার করুন এবং বিনামূল্যে পোস্টার ছাপুন।",
-    nav_pledge: "অঙ্গীকার", nav_habits: "অভ্যাস", nav_posters: "পোস্টার", nav_join: "যোগ দিন", nav_blog: "ব্লগ", nav_community: "কমিউনিটি",
+    nav_pledge: "অঙ্গীকার", nav_habits: "অভ্যাস", nav_posters: "পোস্টার", nav_join: "যোগ দিন", nav_blog: "ব্লগ", nav_careers: "কর্মসংস্থান", nav_community: "কমিউনিটি",
     h1: "লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।",
     lead: "গণপরিবহনের প্রতিটি জায়গায় আত্মশৃঙ্খলার জন্য নাগরিকদের উদ্যোগ। ধাক্কাধাক্কি নয়, তাড়াহুড়ো নয়, দরজায় ভিড় নয়। সবাই লাইনে অপেক্ষা করেন এবং সবাই ওঠেন।",
     cta_pledge: "অঙ্গীকার করুন", cta_share: "শেয়ার করুন",
@@ -378,6 +389,7 @@ window.QI_T = {
     tagline: "নাগরিকদের উদ্যোগ। লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।"
   },
   ta: {
+    nav_song: "பாடல்", songKicker: "எங்கள் ஒழுக்கப் பாடல்", songSub: "ஒழுக்கத்தால் முன்னேறும் இந்தியா", song_play: "பாடலை இயக்கு", song_pause: "நிறுத்து", song_resume: "மீண்டும் இயக்கு", song_restart: "தொடக்கத்திலிருந்து", song_noaudio: "உங்கள் உலாவியால் இசையை இயக்க முடியவில்லை, ஆனால் கீழே உள்ள வரிகளைப் படித்துப் பாடலாம்.", songNote: "வரிகளும் இசையும் சொந்த படைப்பு, அனைவருக்கும் இலவசம், பதிப்புரிமை இல்லை (CC0). இசையை உங்கள் உலாவியே இயக்குகிறது, Play அழுத்தினால் மட்டுமே தொடங்கும்.",
     f_wall: "உறுதிமொழிச் சுவருக்கு ஒரு வரி (விருப்பம்)",
     wallH: "உறுதிமொழிச் சுவர்",
     wallLead: "உறுதிமொழி எடுத்தவர்களின் வார்த்தைகள்.",
@@ -406,7 +418,7 @@ window.QI_T = {
     photo: "புகைப்படம்",
     title: "Qindiaglobal · வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்.",
     desc: "பொதுப் போக்குவரத்தின் ஒவ்வொரு இடத்திலும் ஒழுங்கான வரிசைக்கும் சுயஒழுக்கத்திற்கும் குடிமக்களின் முன்னெடுப்பு. உறுதிமொழி எடுங்கள், பகிருங்கள், இலவச சுவரொட்டிகளை அச்சிடுங்கள்.",
-    nav_pledge: "உறுதிமொழி", nav_habits: "பழக்கங்கள்", nav_posters: "சுவரொட்டிகள்", nav_join: "இணையுங்கள்", nav_blog: "வலைப்பதிவு", nav_community: "சமூகம்",
+    nav_pledge: "உறுதிமொழி", nav_habits: "பழக்கங்கள்", nav_posters: "சுவரொட்டிகள்", nav_join: "இணையுங்கள்", nav_blog: "வலைப்பதிவு", nav_careers: "பணிவாய்ப்புகள்", nav_community: "சமூகம்",
     h1: "வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்.",
     lead: "பொதுப் போக்குவரத்தின் ஒவ்வொரு இடத்திலும் சுயஒழுக்கத்திற்கான குடிமக்களின் முன்னெடுப்பு. தள்ளுதல் இல்லை, அவசரம் இல்லை, வாசலில் கூட்டம் இல்லை. எல்லோரும் வரிசையில் காத்திருக்கிறார்கள், எல்லோரும் ஏறுகிறார்கள்.",
     cta_pledge: "உறுதிமொழி எடுங்கள்", cta_share: "பகிருங்கள்",
@@ -449,6 +461,7 @@ window.QI_T = {
     tagline: "குடிமக்களின் முன்னெடுப்பு. வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்."
   },
   te: {
+    nav_song: "పాట", songKicker: "మా క్రమశిక్షణ పాట", songSub: "క్రమశిక్షణతో ముందుకు సాగే భారత్", song_play: "పాట ప్లే చేయండి", song_pause: "ఆపండి", song_resume: "మళ్ళీ ప్లే చేయండి", song_restart: "మొదటి నుండి", song_noaudio: "మీ బ్రౌజర్ రాగాన్ని ప్లే చేయలేదు, కానీ కింది పదాలు చదివి మీరు పాడవచ్చు.", songNote: "పదాలు, రాగం సొంతవి, అందరికీ ఉచితం, కాపీరైట్ లేదు (CC0). రాగాన్ని మీ బ్రౌజరే వాయిస్తుంది, Play నొక్కినప్పుడే మొదలవుతుంది.",
     f_wall: "ప్రతిజ్ఞ గోడ కోసం ఒక వాక్యం (ఐచ్ఛికం)",
     wallH: "ప్రతిజ్ఞ గోడ",
     wallLead: "ప్రతిజ్ఞ చేసినవారి మాటలు.",
@@ -477,7 +490,7 @@ window.QI_T = {
     photo: "ఫోటో",
     title: "Qindiaglobal · వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి.",
     desc: "ప్రజా రవాణాలోని ప్రతి చోటా క్రమమైన వరుస, స్వీయ క్రమశిక్షణ కోసం పౌరుల చొరవ. ప్రతిజ్ఞ చేయండి, షేర్ చేయండి, ఉచిత పోస్టర్లు ముద్రించండి.",
-    nav_pledge: "ప్రతిజ్ఞ", nav_habits: "అలవాట్లు", nav_posters: "పోస్టర్లు", nav_join: "చేరండి", nav_blog: "బ్లాగ్", nav_community: "సమాజం",
+    nav_pledge: "ప్రతిజ్ఞ", nav_habits: "అలవాట్లు", nav_posters: "పోస్టర్లు", nav_join: "చేరండి", nav_blog: "బ్లాగ్", nav_careers: "ఉద్యోగావకాశాలు", nav_community: "సమాజం",
     h1: "వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి.",
     lead: "ప్రజా రవాణాలోని ప్రతి చోటా స్వీయ క్రమశిక్షణ కోసం పౌరుల చొరవ. తోసుకోవడం లేదు, హడావిడి లేదు, తలుపు దగ్గర గుంపు లేదు. అందరూ వరుసలో వేచి ఉంటారు, అందరూ ఎక్కుతారు.",
     cta_pledge: "ప్రతిజ్ఞ చేయండి", cta_share: "షేర్ చేయండి",
@@ -520,6 +533,7 @@ window.QI_T = {
     tagline: "పౌరుల చొరవ. వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి."
   },
   es: {
+    nav_song: "Canción", songKicker: "Nuestra canción de la disciplina", songSub: "India avanza con disciplina", song_play: "Escuchar la canción", song_pause: "Pausa", song_resume: "Seguir", song_restart: "Desde el inicio", song_noaudio: "Tu navegador no puede tocar la melodía, pero puedes leer y cantar la letra de abajo.", songNote: "La letra y la melodía son originales y libres para todos, sin derechos de autor (CC0). La melodía la toca tu navegador y solo empieza al pulsar Play.",
     f_wall: "Una frase para el Muro de compromisos (opcional)",
     wallH: "Muro de compromisos",
     wallLead: "Palabras de quienes hicieron el compromiso.",
@@ -548,7 +562,7 @@ window.QI_T = {
     photo: "Foto",
     title: "Qindiaglobal · Haz la fila. Sube con dignidad.",
     desc: "Una iniciativa ciudadana por filas ordenadas y autodisciplina en todo el transporte público. Haz el compromiso, compártelo e imprime carteles gratis.",
-    nav_pledge: "Compromiso", nav_habits: "Hábitos", nav_posters: "Carteles", nav_join: "Únete", nav_blog: "Blog", nav_community: "Comunidad",
+    nav_pledge: "Compromiso", nav_habits: "Hábitos", nav_posters: "Carteles", nav_join: "Únete", nav_blog: "Blog", nav_careers: "Empleo", nav_community: "Comunidad",
     h1: "Haz la fila. Sube con dignidad.",
     lead: "Una iniciativa ciudadana por la autodisciplina en todos los lugares del transporte público. Sin empujones, sin prisas, sin aglomeraciones en la puerta. Todos esperan en la fila y todos suben.",
     cta_pledge: "Haz el compromiso", cta_share: "Compartir",
@@ -591,6 +605,7 @@ window.QI_T = {
     tagline: "Una iniciativa ciudadana. Haz la fila. Sube con dignidad."
   },
   fr: {
+    nav_song: "Chanson", songKicker: "Notre chanson de la discipline", songSub: "L'Inde avance avec discipline", song_play: "Écouter la chanson", song_pause: "Pause", song_resume: "Reprendre", song_restart: "Depuis le début", song_noaudio: "Votre navigateur ne peut pas jouer la mélodie, mais vous pouvez lire et chanter les paroles ci-dessous.", songNote: "Les paroles et la mélodie sont originales et libres pour tous, sans droits d'auteur (CC0). La mélodie est jouée par votre navigateur et ne démarre que si vous appuyez sur Play.",
     f_wall: "Une phrase pour le Mur des engagements (facultatif)",
     wallH: "Mur des engagements",
     wallLead: "Les mots de celles et ceux qui ont pris l'engagement.",
@@ -619,7 +634,7 @@ window.QI_T = {
     photo: "Photo",
     title: "Qindiaglobal · Faites la queue. Montez avec dignité.",
     desc: "Une initiative citoyenne pour des files d'attente ordonnées et l'autodiscipline dans tous les transports publics. Prenez l'engagement, partagez-le et imprimez des affiches gratuites.",
-    nav_pledge: "Engagement", nav_habits: "Habitudes", nav_posters: "Affiches", nav_join: "Nous rejoindre", nav_blog: "Blog", nav_community: "Communauté",
+    nav_pledge: "Engagement", nav_habits: "Habitudes", nav_posters: "Affiches", nav_join: "Nous rejoindre", nav_blog: "Blog", nav_careers: "Carrières", nav_community: "Communauté",
     h1: "Faites la queue. Montez avec dignité.",
     lead: "Une initiative citoyenne pour l'autodiscipline partout dans les transports publics. Pas de bousculade, pas de précipitation, pas de foule devant la porte. Chacun attend son tour et tout le monde monte.",
     cta_pledge: "Prendre l'engagement", cta_share: "Partager",
@@ -662,6 +677,7 @@ window.QI_T = {
     tagline: "Une initiative citoyenne. Faites la queue. Montez avec dignité."
   },
   ar: {
+    nav_song: "أغنية", songKicker: "أغنية الانضباط", songSub: "الهند تتقدم بالانضباط", song_play: "تشغيل الأغنية", song_pause: "إيقاف مؤقت", song_resume: "متابعة", song_restart: "من البداية", song_noaudio: "لا يستطيع متصفحك تشغيل اللحن، لكن يمكنك قراءة الكلمات أدناه وغناءها.", songNote: "الكلمات واللحن أصليان ومتاحان للجميع مجانًا، بلا حقوق نشر (CC0). يعزف متصفحك اللحن، ولا يبدأ إلا عند الضغط على Play.",
     f_wall: "سطر لجدار التعهدات (اختياري)",
     wallH: "جدار التعهدات",
     wallLead: "كلمات من الذين قدّموا التعهد.",
@@ -690,7 +706,7 @@ window.QI_T = {
     photo: "صورة",
     title: "Qindiaglobal · قف في الطابور. اصعد بكرامة.",
     desc: "مبادرة مواطنين من أجل طوابير منظمة وانضباط ذاتي في كل أماكن النقل العام. قدّم تعهدك، وشاركه، واطبع ملصقات مجانية.",
-    nav_pledge: "التعهد", nav_habits: "العادات", nav_posters: "الملصقات", nav_join: "انضم إلينا", nav_blog: "المدونة", nav_community: "المجتمع",
+    nav_pledge: "التعهد", nav_habits: "العادات", nav_posters: "الملصقات", nav_join: "انضم إلينا", nav_blog: "المدونة", nav_careers: "الوظائف", nav_community: "المجتمع",
     h1: "قف في الطابور. اصعد بكرامة.",
     lead: "مبادرة مواطنين من أجل الانضباط الذاتي في كل أماكن النقل العام. لا دفع، لا تسرّع، لا ازدحام عند الباب. الجميع ينتظر في الطابور والجميع يصعد.",
     cta_pledge: "قدّم تعهدك", cta_share: "شارك",

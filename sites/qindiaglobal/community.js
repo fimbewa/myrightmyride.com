@@ -140,10 +140,52 @@
       h("p", { cls: "code", text: code }),
       h("p", {}, h("button", { cls: "btn", onclick: then }, "I have saved it"))));
   }
+  // "Continue with Google / Facebook" buttons, shown only for the ones the owner switched on.
+  let oauthOn = null;
+  function socialButtons() {
+    const box = h("div", { cls: "social" });
+    (oauthOn || (oauthOn = api("/api/s/oauth").catch(() => ({})))).then(on => {
+      const ref = savedRef(), q = ref ? "?ref=" + encodeURIComponent(ref) : "";
+      const btns = [["google", "Continue with Google", "G"], ["facebook", "Continue with Facebook", "f"]].filter(([p]) => on[p])
+        .map(([p, label, icon]) => h("a", { cls: "sbtn social-" + p, href: "/auth/" + p + "/start" + q }, h("b", { "aria-hidden": "true", text: icon }), label));
+      if (btns.length) box.append(...btns, h("p", { cls: "or", text: "or with a username" }));
+    });
+    return box;
+  }
+  function oauthError(why) {
+    const TXT = { cancel: "Sign-in was cancelled.", expired: "The sign-in took too long or was opened in another browser. Please try again.", failed: "Google or Facebook did not confirm the sign-in. Please try again, or use a username and password.",
+      off: "This sign-in option is not switched on yet. Please use a username and password.", banned: "This account has been stopped by the site owner for breaking the rules.", busy: "Too many tries. Please wait a little." };
+    loginPage(); alertNote(TXT[why] || TXT.failed);
+  }
+  async function oauthPage(code) {
+    let d; try { d = await api("/api/s/oauth/claim", { body: { code }, noLogout: true }); } catch (e) { loginPage(); return alertNote(e.message); }
+    if (d.token) { setToken(d.token); await loadMe(); return go("#/"); }
+    const m = msgBox();
+    const f = h("form", { cls: "card" },
+      h("h1", { text: "Almost done" }),
+      h("p", { cls: "muted", text: "You signed in with " + d.pending.provider + ". Choose how your name and username appear on Q India Community." }),
+      h("div", {}, h("label", { for: "on", text: "Your name" }), h("input", { id: "on", name: "name", maxlength: 50, value: d.pending.name, required: true })),
+      h("div", {}, h("label", { for: "ou", text: "Username" }), h("input", { id: "ou", name: "username", maxlength: 20, value: d.pending.username, autocapitalize: "none", required: true }),
+        h("small", { cls: "muted", text: "3 to 20 small English letters, numbers, _ or ." })),
+      h("div", {}, h("label", { for: "oc", text: "City (optional)" }), h("input", { id: "oc", name: "city", maxlength: 60 })),
+      h("label", { cls: "tick" }, h("input", { type: "checkbox", name: "agree", required: true }), h("span", {}, "I am 18 or older. I agree to the ", h("a", { href: "/legal/terms", target: "_blank" }, "Terms of Use"), " and ", h("a", { href: "/legal/community-guidelines", target: "_blank" }, "Community Guidelines"), ", and I consent to Qindiaglobal using my details as the ", h("a", { href: "/legal/privacy", target: "_blank" }, "Privacy Policy"), " explains.")),
+      h("p", { cls: "muted", style: "font-size:13px;margin:0", text: "From " + d.pending.provider + " we receive only your name and an account number, nothing else. We never post on your " + d.pending.provider + "." }),
+      h("button", { cls: "btn" }, "Join"), m);
+    f.username.oninput = () => { f.username.value = f.username.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""); };
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Please wait…", true);
+      try {
+        const r = await api("/api/s/oauth/finish", { body: { code, name: f.name.value, username: f.username.value, city: f.city.value, agree: f.agree.checked, ref: savedRef() }, noLogout: true });
+        try { localStorage.removeItem("qi_s_ref"); } catch {}
+        setToken(r.token); await loadMe(); go("#/me/edit");
+      } catch (err) { say(m, err.message); }
+    };
+    show(f);
+  }
   function loginPage() {
     const m = msgBox();
     const f = h("form", { cls: "card" },
-      h("h1", { text: "Log in" }),
+      h("h1", { text: "Log in" }), socialButtons(),
       h("div", {}, h("label", { for: "lu", text: "Username" }), h("input", { id: "lu", name: "username", autocomplete: "username", autocapitalize: "none", required: true })),
       h("div", {}, h("label", { for: "lp", text: "Password" }), h("input", { id: "lp", name: "password", type: "password", autocomplete: "current-password", required: true })),
       h("button", { cls: "btn" }, "Log in"), m,
@@ -159,7 +201,7 @@
     newTicket();
     const m = msgBox();
     const f = h("form", { cls: "card" },
-      h("h1", { text: "Create your free account" }),
+      h("h1", { text: "Create your free account" }), socialButtons(),
       h("p", { cls: "muted", text: "Join citizens who queue up and board with dignity. Share posts and photos, follow people and message friends. Everything is free." }),
       h("div", {}, h("label", { for: "sn", text: "Your name" }), h("input", { id: "sn", name: "name", maxlength: 50, autocomplete: "name", required: true })),
       h("div", {}, h("label", { for: "su", text: "Choose a username" }), h("input", { id: "su", name: "username", maxlength: 20, autocomplete: "username", autocapitalize: "none", placeholder: "for example ravi_patil", required: true }),
@@ -280,6 +322,14 @@
     await loadMore(list, b => `/api/s/feed?tab=${tab}&before=${b}`, d => d.posts.map(p => postCard(p)),
       tab === "following" ? h("div", { cls: "empty" }, h("p", { text: "Nothing here yet. Follow people to see their posts, or look at everyone's posts." }), h("a", { cls: "sbtn", href: "#/all" }, "See everyone"), " ", h("a", { cls: "sbtn", href: "#/search" }, "Find people"))
         : h("p", { cls: "empty", text: "No posts yet. Be the first to share something!" }));
+    feedAd(list);
+  }
+  // One ad box in the feed, after the third post (always marked "Ad"; filled by /ads.js, hidden when there is no ad).
+  function feedAd(list) {
+    const posts = list.querySelectorAll("article.post");
+    if (posts.length < 3 || list.querySelector(".qi-ad")) return;
+    posts[2].after(h("div", { cls: "qi-ad", "data-slot": "feed" }));
+    document.body.append(h("script", { src: "/ads.js" })); // ads.js looks for ad boxes each time it runs
   }
   // Fills a list page by page ("Show more" button at the end).
   async function loadMore(list, url, render, emptyNode, before = 2 ** 53) {
@@ -411,15 +461,18 @@
     const dm = h("select", { name: "dm" }, h("option", { value: "everyone" }, "Everyone (people I don't follow can send one request)"), h("option", { value: "following" }, "Only people I follow"));
     dm.value = me.dm; dm.onchange = async () => { try { await api("/api/s/me", { body: { dm: dm.value } }); say(dmMsg, "Saved.", true); } catch (e) { say(dmMsg, e.message); } };
     const pm = msgBox();
-    const pf = h("form", {}, h("input", { name: "old", type: "password", placeholder: "Current password", autocomplete: "current-password", required: true }),
+    const pf = h("form", {}, !me.hasPassword && h("p", { cls: "muted", text: "You joined with Google or Facebook. Set a password if you also want to log in with your username." }),
+      me.hasPassword && h("input", { name: "old", type: "password", placeholder: "Current password", autocomplete: "current-password", required: true }),
       h("input", { name: "password", type: "password", placeholder: "New password (at least 8 characters)", minlength: 8, autocomplete: "new-password", required: true }), h("button", { cls: "sbtn dark" }, "Change password"), pm);
-    pf.onsubmit = async e => { e.preventDefault(); try { await api("/api/s/password", { body: { old: pf.old.value, password: pf.password.value } }); pf.reset(); say(pm, "Password changed. Other phones were logged out.", true); } catch (err) { say(pm, err.message); } };
+    pf.onsubmit = async e => { e.preventDefault(); try { await api("/api/s/password", { body: { old: pf.old ? pf.old.value : "", password: pf.password.value } }); await loadMe(); pf.reset(); say(pm, "Password changed. Other phones were logged out.", true); } catch (err) { say(pm, err.message); } };
     const dmsg = msgBox();
     const df = h("form", {}, h("p", { cls: "muted", text: "This removes your profile, posts, comments, likes, photos and the messages you sent. It cannot be undone." }),
-      h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true }), h("button", { cls: "sbtn" }, "Delete my account"), dmsg);
+      me.hasPassword ? h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true })
+        : h("input", { name: "confirm", placeholder: "Type your username (" + me.username + ") to confirm", autocapitalize: "none", required: true }),
+      h("button", { cls: "sbtn" }, "Delete my account"), dmsg);
     df.onsubmit = async e => {
       e.preventDefault(); if (!confirm("Delete your account and everything in it forever?")) return;
-      try { await api("/api/s/delete-account", { body: { password: df.password.value } }); setToken(""); me = null; badges(); go("#/"); } catch (err) { say(dmsg, err.message); }
+      try { await api("/api/s/delete-account", { body: { password: df.password ? df.password.value : "", confirm: df.confirm ? df.confirm.value : "" } }); setToken(""); me = null; badges(); go("#/"); } catch (err) { say(dmsg, err.message); }
     };
     const out = h("button", { cls: "sbtn" }, "Log out");
     out.onclick = async () => { await api("/api/s/logout", { body: {} }).catch(() => {}); setToken(""); me = null; badges(); go("#/"); };
@@ -430,6 +483,11 @@
     show(h("h1", { text: "Settings" }), inv,
       h("div", { cls: "card" }, h("label", { text: "Who can message me" }), dm, dmMsg),
       h("div", { cls: "card" }, h("label", { text: "Password" }), pf),
+      (me.linked || []).length > 0 && h("div", { cls: "card" }, h("label", { text: "Signed in with" }), ...(me.linked || []).map(p => {
+        const b = h("button", { cls: "sbtn" }, "Remove");
+        b.onclick = async () => { try { await api("/api/s/oauth/unlink", { body: { provider: p } }); settingsPage(); } catch (e) { alertNote(e.message); } };
+        return h("p", { cls: "row" }, h("b", { cls: "grow", text: p === "google" ? "Google" : "Facebook" }), b);
+      })),
       h("div", { cls: "card" }, h("p", {}, "Logged in as ", h("b", { text: "@" + me.username })), out),
       h("div", { cls: "card" }, h("label", { text: "Delete account" }), df));
   }
@@ -516,6 +574,8 @@
       case "login": return me ? go("#/") : loginPage();
       case "signup": return me ? go("#/") : signupPage();
       case "recover": return recoverPage();
+      case "oauth": return oauthPage(b);
+      case "oauth-error": return me ? go("#/") : oauthError(b);
       case "new": return me ? show(composer(p => go("#/p/" + p.id))) : needLogin();
       case "p": return postPage(Number(b));
       case "u": return profilePage(b, c === "followers" || c === "following" ? c : null);

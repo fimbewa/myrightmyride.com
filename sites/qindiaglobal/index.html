@@ -58,7 +58,7 @@
     <select id="lang" aria-label="Language"></select>
   </div>
   <nav class="wrap nav">
-    <a href="#pledge" data-t="nav_pledge"></a><a href="#habits" data-t="nav_habits"></a><a href="#photos" data-t="nav_photos"></a><a href="#posters" data-t="nav_posters"></a><a href="#join" data-t="nav_join"></a><a href="/community" data-t="nav_community"></a><a href="/blog/" data-t="nav_blog"></a>
+    <a href="#pledge" data-t="nav_pledge"></a><a href="/careers" data-t="nav_careers"></a><a href="#song" data-t="nav_song"></a><a href="#habits" data-t="nav_habits"></a><a href="#photos" data-t="nav_photos"></a><a href="#posters" data-t="nav_posters"></a><a href="#join" data-t="nav_join"></a><a href="/community" data-t="nav_community"></a><a href="/blog/" data-t="nav_blog"></a>
   </nav>
 </header>
 
@@ -78,6 +78,56 @@
         <span data-t="count_label"></span>
       </div>
     </div>
+  </section>
+
+  <section id="song" class="wrap block song">
+    <div class="song-card">
+      <p class="song-kicker" data-t="songKicker"></p>
+      <h2 lang="hi" dir="ltr">पंक्ति में हम, प्रगति में देश</h2>
+      <p class="song-sub"><i dir="ltr">Pankti mein hum, pragati mein desh</i> · <span data-t="songSub"></span></p>
+      <div class="song-ctl">
+        <button class="btn song-play" id="songPlay" type="button">
+          <span class="ico" aria-hidden="true"></span>
+          <span class="l-play" data-t="song_play"></span><span class="l-pause" data-t="song_pause"></span><span class="l-resume" data-t="song_resume"></span>
+        </button>
+        <button class="btn ghost" id="songRestart" type="button" data-t="song_restart" hidden></button>
+      </div>
+      <div class="song-track" aria-hidden="true"><i id="songBar"></i></div>
+      <p class="song-noaudio" data-t="song_noaudio"></p>
+    </div>
+    <div class="lyrics" aria-label="Lyrics" dir="ltr">
+      <p class="part verse"><span lang="hi">अंतरा 1</span> · Verse 1</p>
+      <p class="ln" data-line="0"><span class="hi" lang="hi">धीरे-धीरे, बारी-बारी, आगे बढ़ते जाएँगे,</span><span class="en">Slowly, one by one, we will keep moving ahead,</span></p>
+      <p class="ln" data-line="1"><span class="hi" lang="hi">धक्का-मुक्की छोड़ के हम, शान से चढ़ते जाएँगे।</span><span class="en">leaving all pushing and shoving, we will board with dignity.</span></p>
+      <p class="ln" data-line="2"><span class="hi" lang="hi">पहले उतरें, फिर हम चढ़ें, छोटा-सा ये नियम है,</span><span class="en">Let them get off first, then we get on: a small rule,</span></p>
+      <p class="ln" data-line="3"><span class="hi" lang="hi">हर स्टेशन, हर बस-स्टॉप पर, अपना ये संयम है।</span><span class="en">at every station and every bus stop, this is our self-control.</span></p>
+      <p class="part chorus"><span lang="hi">मुखड़ा (सब मिलकर)</span> · Chorus (all together)</p>
+      <p class="ln ch" data-line="4"><span class="hi" lang="hi">पंक्ति में हम, प्रगति में देश,</span><span class="en">We in a line, the nation in progress,</span></p>
+      <p class="ln ch" data-line="5"><span class="hi" lang="hi">अनुशासन से बदले भारत का वेश।</span><span class="en">with discipline, the face of India changes.</span></p>
+      <p class="ln ch" data-line="6"><span class="hi" lang="hi">एक क़तार, एक विचार,</span><span class="en">One queue, one thought,</span></p>
+      <p class="ln ch" data-line="7"><span class="hi" lang="hi">दुनिया में चमके भारत, यही संदेश।</span><span class="en">may India shine in the world: this is our message.</span></p>
+      <p class="part verse"><span lang="hi">अंतरा 2</span> · Verse 2</p>
+      <p class="ln" data-line="8"><span class="hi" lang="hi">बूढ़े, बच्चे, बहनें, दिव्यांग, पहले इनको जगह मिले,</span><span class="en">Elders, children, women and persons with disabilities get a place first,</span></p>
+      <p class="ln" data-line="9"><span class="hi" lang="hi">थोड़ा रुककर, मुस्काकर, सबके मन में फूल खिलें।</span><span class="en">we pause a little and smile, and flowers bloom in every heart.</span></p>
+      <p class="ln" data-line="10"><span class="hi" lang="hi">ना कोई ऊँचा, ना कोई नीचा, बारी सबकी आएगी,</span><span class="en">No one is higher, no one is lower, everyone's turn will come,</span></p>
+      <p class="ln" data-line="11"><span class="hi" lang="hi">छोटी-सी ये आदत अपनी, देश को आगे लाएगी।</span><span class="en">this small habit of ours will take the nation forward.</span></p>
+      <p class="part chorus"><span lang="hi">मुखड़ा (सब मिलकर)</span> · Chorus (all together)</p>
+      <p class="ln ch" data-line="12"><span class="hi" lang="hi">पंक्ति में हम, प्रगति में देश,</span><span class="en">We in a line, the nation in progress,</span></p>
+      <p class="ln ch" data-line="13"><span class="hi" lang="hi">अनुशासन से बदले भारत का वेश।</span><span class="en">with discipline, the face of India changes.</span></p>
+      <p class="ln ch" data-line="14"><span class="hi" lang="hi">एक क़तार, एक विचार,</span><span class="en">One queue, one thought,</span></p>
+      <p class="ln ch" data-line="15"><span class="hi" lang="hi">दुनिया में चमके भारत, यही संदेश।</span><span class="en">may India shine in the world: this is our message.</span></p>
+      <p class="part verse"><span lang="hi">अंतरा 3</span> · Verse 3</p>
+      <p class="ln" data-line="16"><span class="hi" lang="hi">गंगा जैसी धारा बहती, जब सब चलें क़तार में,</span><span class="en">Like the flowing Ganga, when we all move in a queue,</span></p>
+      <p class="ln" data-line="17"><span class="hi" lang="hi">बिना शोर और बिना होड़ के, ताक़त है व्यवहार में।</span><span class="en">without noise and without a race, our strength is in our conduct.</span></p>
+      <p class="ln" data-line="18"><span class="hi" lang="hi">आओ मिलकर प्रण ये लें हम, घर से लेकर दुनिया तक,</span><span class="en">Come, let us all take this pledge, from our home to the whole world,</span></p>
+      <p class="ln" data-line="19"><span class="hi" lang="hi">अनुशासन का दीप जलाएँ, भारत से हर दिशा तक।</span><span class="en">let us light the lamp of discipline, from India to every direction.</span></p>
+      <p class="part chorus"><span lang="hi">मुखड़ा (सब मिलकर)</span> · Chorus (all together)</p>
+      <p class="ln ch" data-line="20"><span class="hi" lang="hi">पंक्ति में हम, प्रगति में देश,</span><span class="en">We in a line, the nation in progress,</span></p>
+      <p class="ln ch" data-line="21"><span class="hi" lang="hi">अनुशासन से बदले भारत का वेश।</span><span class="en">with discipline, the face of India changes.</span></p>
+      <p class="ln ch" data-line="22"><span class="hi" lang="hi">एक क़तार, एक विचार,</span><span class="en">One queue, one thought,</span></p>
+      <p class="ln ch" data-line="23"><span class="hi" lang="hi">दुनिया में चमके भारत, यही संदेश।</span><span class="en">may India shine in the world: this is our message.</span></p>
+    </div>
+    <p class="song-note" data-t="songNote"></p>
   </section>
 
   <section id="habits" class="wrap block">
@@ -206,6 +256,7 @@
 <script src="/i18n-in1.js"></script>
 <script src="/i18n-in2.js"></script>
 <script src="/site.js"></script>
+<script src="/song.js"></script>
 <script src="/ads.js" defer></script>
 </body>
 </html>

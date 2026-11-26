@@ -28,8 +28,19 @@ CREATE TABLE IF NOT EXISTS q_ads (
 CREATE TABLE IF NOT EXISTS q_ad_days (ad_id INTEGER NOT NULL, day TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, clicks INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(ad_id, day));
 CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 `);
+  // Added later: house ads (source 'house') invite people to join Qindiaglobal itself. They use a picture from the site (img_url)
+  // and show only when no paid ad runs in that box. Made once; the owner can edit, pause or delete them like any ad.
+  if (!db.prepare("PRAGMA table_info(q_ads)").all().some(c => c.name === "img_url")) db.exec("ALTER TABLE q_ads ADD COLUMN img_url TEXT");
   const getKv = k => (db.prepare("SELECT v FROM q_kv WHERE k = ?").get(k) || {}).v;
   const setKv = (k, v) => db.prepare("INSERT INTO q_kv(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(k, String(v));
+  if (!getKv("ads_house_made")) {
+    const t = Date.now(), add = db.prepare(`INSERT INTO q_ads(status, source, advertiser, title, text, link, img_url, slots, weight, created_at, updated_at)
+      VALUES('active', 'house', 'Qindiaglobal', ?, ?, ?, ?, 'home,blog,post,feed', ?, ?, ?)`);
+    add.run("Volunteers wanted: help India queue up", "Give a few hours a week at your station or bus stop. Unpaid, flexible, from anywhere.", "/careers#volunteer", "/img/join-volunteer.svg", 3, t, t);
+    add.run("Become a Q India Reporter", "Share photos and stories of good and bad queues from your city. Your name on our blog.", "/careers#reporter", "/img/join-reporter.svg", 2, t, t);
+    add.run("Speak another Indian language? Help us translate", "Check our pledge and posters in your mother tongue.", "/careers#translator", "/img/join-translator.svg", 1, t, t);
+    db.prepare("INSERT OR REPLACE INTO q_kv(k, v) VALUES('ads_house_made', '1')").run();
+  }
   let secret = getKv("secret");
   if (!secret) { secret = crypto.randomBytes(32).toString("hex"); setKv("secret", secret); }
 
@@ -50,7 +61,7 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Today's date in India, as YYYY-MM-DD (the start/end dates the owner types are Indian dates).
   const today = () => new Date(now() + 5.5 * 3600_000).toISOString().slice(0, 10);
   const dateOrNull = s => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) ? String(s) : null);
-  const goodLink = s => { try { const u = new URL(String(s || "").trim()); return /^https?:$/.test(u.protocol) && u.hostname.includes(".") ? u.href.slice(0, 500) : null; } catch { return null; } };
+  const goodLink = s => { if (/^\/[a-z0-9\-\/#?=&.]*$/i.test(String(s || "").trim()) && !String(s).startsWith("//")) return String(s).trim(); try { const u = new URL(String(s || "").trim()); return /^https?:$/.test(u.protocol) && u.hostname.includes(".") ? u.href.slice(0, 500) : null; } catch { return null; } };
   const slotList = v => { const a = (Array.isArray(v) ? v : String(v || "").split(",")).map(s => String(s).trim()).filter(s => SLOTS.includes(s)); return a.length ? [...new Set(a)].join(",") : null; };
 
   const hits = new Map();
@@ -73,7 +84,7 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   }
 
   // Which ads may show now: active, inside their dates, for this box.
-  const running = slot => db.prepare(`SELECT id, advertiser, title, text, slots, weight, image_type FROM q_ads WHERE status = 'active'
+  const running = slot => db.prepare(`SELECT id, source, advertiser, title, text, slots, weight, image_type, img_url FROM q_ads WHERE status = 'active'
     AND (starts IS NULL OR starts <= @d) AND (ends IS NULL OR ends >= @d) AND (',' || slots || ',') LIKE @s`).all({ d: today(), s: "%," + slot + ",%" });
   function pick(list) {
     const total = list.reduce((s, a) => s + Math.max(1, a.weight), 0);
@@ -102,10 +113,11 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const pubOk = PUB_RX.test(s.adsenseClient) && s.adsenseMode !== "off";
     if (pubOk) out.adsense = { client: "ca-pub-" + PUB_RX.exec(s.adsenseClient)[1], slot: UNIT_RX.test(s.adsenseSlot) ? s.adsenseSlot : "", auto: s.adsenseMode === "auto" };
     for (const slot of String(req.query.slots || "").split(",").filter(x => SLOTS.includes(x)).slice(0, 6)) {
-      const list = running(slot);
+      // Paid (own) ads first; house ads only when no paid ad runs here; Google fills what is left (ads.js).
+      const all = running(slot), paid = all.filter(a => a.source !== "house"), list = paid.length ? paid : all;
       if (!list.length) continue;
       const a = pick(list);
-      out.ads[slot] = { id: a.id, title: a.title, text: a.text || "", by: a.advertiser || "", img: a.image_type ? "/ads/img/" + a.id : "", go: "/ads/go/" + a.id };
+      out.ads[slot] = { id: a.id, title: a.title, text: a.text || "", by: a.advertiser || "", img: a.image_type ? "/ads/img/" + a.id : a.img_url || "", go: "/ads/go/" + a.id, house: a.source === "house" };
     }
     res.json(out);
   });
@@ -168,7 +180,7 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     res.set("Cache-Control", "no-store");
     next();
   }
-  const COLS = "id, status, source, advertiser, contact, title, text, link, image_type, slots, starts, ends, weight, price, paid, note, views, clicks, created_at, updated_at";
+  const COLS = "id, status, source, img_url, advertiser, contact, title, text, link, image_type, slots, starts, ends, weight, price, paid, note, views, clicks, created_at, updated_at";
   r.get("/api/admin/ads", owner, (req, res) => {
     const since = new Date(now() + 5.5 * 3600_000 - 29 * 86400_000).toISOString().slice(0, 10);
     res.json({
