@@ -269,6 +269,8 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     db.prepare("UPDATE q_posts SET title = ?, body = ?, updated_at = ? WHERE id = ?").run(p.title, p.body, now(), id);
     res.json({ ok: true, slug: row.slug, url: "/blog/" + row.slug, chars: chars(p.body) });
   });
+  // Policy pages, Grievance Officer details and the complaint form (server/qindia-legal.js)
+  r.use(require("./qindia-legal").router(db, { owner, human, ipHash, banned, limited }));
   // Q India Community: accounts, posts, feed, follow, private messages (server/qindia-social.js)
   r.use(require("./qindia-social")(db, { human, ipHash, banned, limited, owner }));
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));

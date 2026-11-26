@@ -167,7 +167,8 @@
       h("div", {}, h("label", { for: "sc", text: "City (optional)" }), h("input", { id: "sc", name: "city", maxlength: 60 })),
       h("div", {}, h("label", { for: "sp", text: "Password (at least 8 characters)" }), h("input", { id: "sp", name: "password", type: "password", minlength: 8, autocomplete: "new-password", required: true })),
       h("input", { name: "website", tabindex: "-1", autocomplete: "off", style: "position:absolute;left:-5000px", "aria-hidden": "true" }),
-      h("label", { cls: "tick" }, h("input", { type: "checkbox", name: "agree", required: true }), h("span", {}, "I am 18 or older and I agree to the ", h("a", { href: "/terms.html", target: "_blank" }, "Terms of Use and Privacy Policy"), ". I will not post nudity, abuse, hate or spam.")),
+      h("label", { cls: "tick" }, h("input", { type: "checkbox", name: "agree", required: true }), h("span", {}, "I am 18 or older. I agree to the ", h("a", { href: "/legal/terms", target: "_blank" }, "Terms of Use"), " and ", h("a", { href: "/legal/community-guidelines", target: "_blank" }, "Community Guidelines"), ", and I consent to Qindiaglobal using my details as the ", h("a", { href: "/legal/privacy", target: "_blank" }, "Privacy Policy"), " explains. I will not post nudity, abuse, hate or spam.")),
+      h("p", { cls: "muted", style: "font-size:13px;margin:0" }, "Privacy notice: we use your name, username, password (stored scrambled), optional city and photo, and what you post, only to run your free account and keep the community safe. You can delete your account and withdraw consent at any time in Settings. Questions or complaints: ", h("a", { href: "/legal/grievance", target: "_blank" }, "Grievance Officer"), "."),
       h("button", { cls: "btn" }, "Create account"), m,
       h("p", { cls: "muted" }, "Already have an account? ", h("a", { href: "#/login" }, "Log in")));
     f.username.oninput = () => { f.username.value = f.username.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""); };
@@ -255,6 +256,19 @@
     };
     return f;
   }
+  // Reminder of the rules, at least every 3 months and when they change (IT Intermediary Rules 2021, rule 3(1)(c)).
+  function rulesNote() {
+    if (!me || !me.rulesDue) return "";
+    const box = h("div", { cls: "card", style: "border:2px solid #e85d04" },
+      h("h2", { text: "A reminder of our rules" }),
+      h("p", {}, "Please follow the ", h("a", { href: "/legal/terms", target: "_blank" }, "Terms of Use"), ", ", h("a", { href: "/legal/community-guidelines", target: "_blank" }, "Community Guidelines"), " and ", h("a", { href: "/legal/privacy", target: "_blank" }, "Privacy Policy"), "."),
+      h("p", { text: "If you break them, we may remove your content and suspend or close your account at once. Posting unlawful content (for example sexual content, child abuse, deepfakes, hate, threats or false news) can be punished under the Information Technology Act, 2000, the Bharatiya Nyaya Sanhita, 2023 and other laws, and we must report some of it to the authorities." }),
+      h("p", {}, "To complain or appeal, contact our ", h("a", { href: "/legal/grievance", target: "_blank" }, "Grievance Officer"), "."));
+    const ok = h("button", { cls: "btn" }, "I understand");
+    ok.onclick = async () => { ok.disabled = true; await api("/api/s/rules-seen", { body: {} }).catch(() => {}); me.rulesDue = false; box.remove(); };
+    box.append(ok);
+    return box;
+  }
   async function feedPage(tab) {
     tab = me && tab !== "all" ? tab || "following" : "all";
     const list = h("div");
@@ -262,7 +276,7 @@
     const top = me ? composer(p => list.prepend(postCard(p))) : h("div", { cls: "card" }, h("h1", { text: "Q India Community" }),
       h("p", { text: "Share posts and photos, follow people, and message friends privately. Free for everyone, always." }),
       h("p", {}, h("a", { cls: "btn", href: "#/signup" }, "Create free account"), " ", h("a", { cls: "sbtn", href: "#/login" }, "Log in")));
-    show(top, tabs, list);
+    show(rulesNote(), top, tabs, list);
     await loadMore(list, b => `/api/s/feed?tab=${tab}&before=${b}`, d => d.posts.map(p => postCard(p)),
       tab === "following" ? h("div", { cls: "empty" }, h("p", { text: "Nothing here yet. Follow people to see their posts, or look at everyone's posts." }), h("a", { cls: "sbtn", href: "#/all" }, "See everyone"), " ", h("a", { cls: "sbtn", href: "#/search" }, "Find people"))
         : h("p", { cls: "empty", text: "No posts yet. Be the first to share something!" }));

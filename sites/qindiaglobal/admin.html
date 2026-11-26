@@ -110,13 +110,29 @@
     <div style="overflow-x:auto"><table class="tbl" id="pledges"></table></div>
     <h2 style="margin-top:20px">Languages used</h2>
     <table class="tbl" id="langs"></table>
+    <h2 style="margin-top:20px" id="legal">Grievance Officer and policies</h2>
+    <p class="small-note">These details are shown on every policy page at <a href="/legal/" target="_blank">qindiaglobal.com/legal</a>. Complaints from the <a href="/legal/grievance" target="_blank">complaint form</a> appear above under Messages with a number (Q-…) and the date by which the law expects an answer: <b>2 hours</b> for intimate images or impersonation, <b>36 hours</b> for other unlawful content, <b>7 days</b> for other complaints, <b>30 days</b> for personal data requests.</p>
+    <form id="legalForm" class="card" style="margin-top:0">
+      <label>Grievance Officer's name<input name="officer" maxlength="120"></label>
+      <label>Designation<input name="designation" maxlength="120"></label>
+      <label>Email for complaints<input name="email" type="email" maxlength="120"></label>
+      <label>Phone (optional; leave empty to hide)<input name="phone" maxlength="120"></label>
+      <label>Postal address<input name="address" maxlength="300"></label>
+      <label>Working hours<input name="hours" maxlength="120" placeholder="Monday to Saturday, 10 am to 6 pm IST"></label>
+      <label>City of courts, mediation and arbitration<input name="city" maxlength="120"></label>
+      <button class="btn">Save details</button>
+      <p class="msg" id="legalMsg"></p>
+    </form>
+    <p class="small-note" id="holdNote"></p>
   </section>
 </main>
 <script src="/i18n.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let tok = ""; try { tok = sessionStorage.getItem("qi_owner") || ""; } catch {}
-const KIND = { volunteer: "Volunteer", idea: "Idea", partner: "Partnership", other: "Other" };
+const KIND = { volunteer: "Volunteer", idea: "Idea", partner: "Partnership", other: "Other", grievance: "COMPLAINT", nci: "URGENT COMPLAINT (intimate image / impersonation)", privacy: "PERSONAL DATA REQUEST", copyright: "COPYRIGHT COMPLAINT", appeal: "APPEAL" };
+// Time the law allows to deal with each kind of complaint (IT Intermediary Rules 2021 as amended in 2026; DPDP Rules 2025).
+const DUE = { grievance: 7 * 864e5, nci: 2 * 36e5, privacy: 30 * 864e5, copyright: 36 * 36e5, appeal: 7 * 864e5 };
 const when = ms => new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 async function api(path, opts = {}) {
@@ -134,7 +150,8 @@ async function load() {
   if (!d.messages.length) box.append(el("p", null, "No messages yet."));
   d.messages.forEach(m => {
     const it = el("div", "item" + (m.done ? " done" : ""));
-    it.append(el("div", "meta", [KIND[m.kind] || m.kind, when(m.created_at), m.lang].filter(Boolean).join(" · ")));
+    it.append(el("div", "meta", [KIND[m.kind] || m.kind, DUE[m.kind] ? "No. Q-" + m.id : "", when(m.created_at), DUE[m.kind] && !m.done ? "answer by " + when(m.created_at + DUE[m.kind]) : "", m.lang].filter(Boolean).join(" · ")));
+    if (DUE[m.kind] && !m.done && Date.now() > m.created_at + DUE[m.kind]) it.style.borderColor = "var(--bad)";
     it.append(el("div", null, [m.name, m.city, m.contact].filter(Boolean).join(" · ") || "(no name)"));
     it.append(el("p", null, m.message));
     const b = el("button", "small-btn", m.done ? "Mark as new" : "Mark as done");
@@ -169,7 +186,20 @@ async function load() {
   fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
   loadPosts().catch(() => {});
   loadCommunity().catch(() => {});
+  loadLegal().catch(() => {});
 }
+async function loadLegal() {
+  const d = await (await api("/api/admin/legal")).json(), f = $("legalForm");
+  for (const k of ["officer", "designation", "email", "phone", "address", "hours", "city"]) f[k].value = d.contact[k] || "";
+  const n = d.hold.reduce((a, x) => a + x.n, 0);
+  $("holdNote").textContent = n ? n + " removed item(s) and closed account(s) are kept out of sight for 180 days, as the IT Rules require, and then erased by themselves." : "";
+}
+$("legalForm").onsubmit = async e => {
+  e.preventDefault(); const f = e.target, msg = $("legalMsg"); msg.className = "msg";
+  const body = {}; for (const k of ["officer", "designation", "email", "phone", "address", "hours", "city"]) body[k] = f[k].value;
+  try { await api("/api/admin/legal", { method: "POST", body: JSON.stringify(body) }); msg.textContent = "Saved. The policy pages now show these details."; msg.classList.add("ok"); }
+  catch (err) { msg.textContent = err.message; msg.classList.add("bad"); }
+};
 // ---------- community moderation ----------
 const cAct = async (body) => { await api("/api/admin/community", { method: "POST", body: JSON.stringify(body) }); loadCommunity(); };
 function cItem(meta, who, text, photo, buttons) {
