@@ -57,10 +57,14 @@ details.card summary{font-weight:700;cursor:pointer;color:var(--deep)}
 
     <h2>Work out a month</h2>
     <form id="monthForm" class="card" style="margin-top:0">
-      <p class="small-note">After a month's ad money has reached your bank (from advertisers, and from Google AdSense when Google pays), type the total here. If it was ₹0, type 0: nobody gets anything. You can do it again for the same month to correct it; amounts already paid stay.</p>
+      <p class="small-note">After a month's ad money has reached your bank, type how much came from advertisers and how much from Google AdSense. If it was ₹0, type 0: nobody gets anything. <b>These figures are shown publicly on qindiaglobal.com/referral</b> so members can check their share. You can do it again for the same month to correct it; amounts already paid stay.</p>
       <div class="row">
         <label>Month <input name="month" type="month" required></label>
-        <label>Ad income received (₹) <input name="income" type="number" min="0" step="1" required></label>
+        <label>From advertisers (₹) <input name="direct" type="number" min="0" step="1" required></label>
+      </div>
+      <div class="row">
+        <label>From Google AdSense (₹) <input name="network" type="number" min="0" step="1" value="0" required></label>
+        <span></span>
       </div>
       <button class="btn">Work out rewards</button><p class="msg" id="monthMsg"></p>
     </form>
@@ -120,7 +124,7 @@ async function load() {
 $("setForm").onsubmit = async e => { e.preventDefault(); const f = e.target, m = $("setMsg");
   try { await api("/api/admin/referral/settings", { method: "POST", body: JSON.stringify({ share: f.share.value, target: f.target.value, on: f.on.checked }) }); m.className = "msg ok"; m.textContent = "Saved."; load(); } catch (err) { m.className = "msg bad"; m.textContent = err.message; } };
 $("monthForm").onsubmit = async e => { e.preventDefault(); const f = e.target, m = $("monthMsg");
-  try { const d = await (await api("/api/admin/referral/month", { method: "POST", body: JSON.stringify({ month: f.month.value, income: f.income.value }) })).json();
+  try { const d = await (await api("/api/admin/referral/month", { method: "POST", body: JSON.stringify({ month: f.month.value, direct: f.direct.value, network: f.network.value }) })).json();
     m.className = "msg ok"; m.textContent = d.pool > 0 && d.people ? "Pool ₹" + nf(d.pool) + " shared between " + d.people + " member(s)." : d.people ? "No ad income, so nothing to pay this month." : "Pool ₹" + nf(d.pool) + ", but nobody has reached the target yet, so nothing to pay."; load();
   } catch (err) { m.className = "msg bad"; m.textContent = err.message; } };
 if (tok) load().catch(() => {}); else $("need").hidden = false;

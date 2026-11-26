@@ -20,6 +20,8 @@
 .tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
 .tbl td,.tbl th{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start}.tbl th{background:var(--bg);font-size:12px;color:var(--muted)}
 .ex{font-size:14px;color:var(--muted)}
+.mrow{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0}.mrow b{display:block;color:var(--deep);margin-bottom:4px}
+.mrow div{display:flex;justify-content:space-between;gap:10px;font-size:15px;border-bottom:1px dashed var(--line);padding:3px 0}.mrow div:last-of-type{border-bottom:0}.mrow p{margin:6px 0 0}
 </style>
 </head>
 <body>
@@ -46,6 +48,12 @@
     </ul>
     <p class="ex"><b>Example:</b> in a month the site receives ₹50,000 from ads. 10% = ₹5,000 is the reward pool. Two members qualify: one with 3,000 sign-ups and one with 2,000. They get ₹3,000 and ₹2,000. If that month's ad income were ₹0, both would get ₹0.</p>
     <p>Full rules: <a href="/legal/referral">Referral Program Terms</a>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Monthly ad income report</h2>
+    <p class="ex">Everyone can see these figures. Each month, after the ad money reaches Qindiaglobal's bank account, the owner enters how much came from advertisers and from Google AdSense. The website then works out the reward pool and each member's share automatically. Google usually pays 3 to 8 weeks after the month ends, so a month appears here only after its money has arrived.</p>
+    <div id="report" style="overflow-x:auto"><p class="ex">No month has been worked out yet.</p></div>
   </section>
 
   <section id="out" class="card" hidden>
@@ -102,13 +110,31 @@
   const go = l => { sel.value = l; QI_apply(l); document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; main.dir = "ltr"; };
   sel.onchange = () => go(sel.value); go(QI_pick());
   const $ = id => document.getElementById(id), nf = n => Number(n || 0).toLocaleString("en-IN");
+  let report = [];
   let tok = ""; try { tok = localStorage.getItem("qi_s_token") || ""; } catch {}
   const api = (p, body) => fetch(p, { method: body ? "POST" : "GET", headers: { "content-type": "application/json", authorization: "Bearer " + tok }, body: body ? JSON.stringify(body) : undefined })
     .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || "Server not reachable"), { status: r.status }); return d; });
   function load() {
+    const reportReady = api("/api/referral/report").then(d => {
+      report = d.months;
+      if (!report.length) return;
+      const rs = v => (v == null ? "-" : "₹" + nf(v));
+      const mname = m => new Date(m + "-15").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+      $("report").replaceChildren(...report.map(m => {
+        const c = document.createElement("div"); c.className = "mrow";
+        const h = document.createElement("b"); h.textContent = mname(m.month); c.append(h);
+        [["From advertisers", rs(m.direct)], ["From Google AdSense", rs(m.network)], ["Total ad income", rs(m.income)],
+         ["Reward pool (" + m.share + "%)", "₹" + nf(m.pool)], ["Members sharing it", nf(m.people) + (m.people ? " (" + nf(m.signups) + " sign-ups in total)" : "")],
+         ["Paid", m.people ? nf(m.paid) + " of " + nf(m.people) : "-"]].forEach(([k, v]) => {
+          const r = document.createElement("div"); const a = document.createElement("span"); a.textContent = k; const b = document.createElement("span"); b.textContent = v; r.append(a, b); c.append(r); });
+        const why = !m.income ? "No ad income this month, so no rewards." : !m.people ? "Nobody had reached the sign-up target yet, so no rewards were due." : "";
+        if (why) { const z = document.createElement("p"); z.className = "ex"; z.textContent = why; c.append(z); }
+        return c;
+      }));
+    }).catch(() => {});
     api("/api/referral/rules").then(d => { document.querySelectorAll(".tgt").forEach(e => { e.textContent = nf(d.target); }); $("tTarget").textContent = nf(d.target); $("tShare").textContent = d.share; }).catch(() => {});
     if (!tok) { $("out").hidden = false; return; }
-    api("/api/referral/me").then(d => {
+    Promise.all([api("/api/referral/me"), reportReady]).then(([d]) => {
       $("in").hidden = false;
       document.querySelectorAll(".tgt").forEach(e => { e.textContent = nf(d.target); }); $("tTarget").textContent = nf(d.target); $("tShare").textContent = d.share;
       $("link").textContent = d.link;
@@ -122,8 +148,9 @@
       const box = $("payouts"); box.replaceChildren();
       if (!d.payouts.length) { const p = document.createElement("p"); p.className = "ex"; p.textContent = "No rewards yet."; box.append(p); return; }
       const t = document.createElement("table"); t.className = "tbl";
-      t.innerHTML = "<tr><th>Month</th><th>Your sign-ups</th><th>Reward</th><th>Status</th></tr>";
-      d.payouts.forEach(x => { const tr = t.insertRow(); [x.month, nf(x.signups), "₹" + nf(x.amount), x.status === "paid" ? "Paid" : "To be paid"].forEach(v => { tr.insertCell().textContent = v; }); });
+      t.innerHTML = "<tr><th>Month</th><th>Your sign-ups</th><th>Your share</th><th>Reward</th><th>Status</th></tr>";
+      d.payouts.forEach(x => { const m = report.find(r => r.month === x.month), part = m && m.signups ? Math.round(x.signups / m.signups * 1000) / 10 + "% of ₹" + nf(m.pool) : "-";
+        const tr = t.insertRow(); [x.month, nf(x.signups), part, "₹" + nf(x.amount), x.status === "paid" ? "Paid" : "To be paid"].forEach(v => { tr.insertCell().textContent = v; }); });
       box.append(t);
     }).catch(e => { if (e.status === 401) { try { localStorage.removeItem("qi_s_token"); } catch {} tok = ""; $("out").hidden = false; } });
   }

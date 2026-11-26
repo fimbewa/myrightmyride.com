@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS q_ref_payouts (
   UNIQUE(month, user_id));
 CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 `);
+  // Added later: where the month's ad income came from (advertisers paying us directly / Google AdSense and other networks),
+  // shown publicly on /referral so members can check the figures.
+  const monthCols = db.prepare("PRAGMA table_info(q_ref_months)").all().map(c => c.name);
+  if (!monthCols.includes("direct")) db.exec("ALTER TABLE q_ref_months ADD COLUMN direct REAL");
+  if (!monthCols.includes("network")) db.exec("ALTER TABLE q_ref_months ADD COLUMN network REAL");
   const getKv = k => (db.prepare("SELECT v FROM q_kv WHERE k = ?").get(k) || {}).v;
   const setKv = (k, v) => db.prepare("INSERT INTO q_kv(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(k, String(v));
   const settings = () => ({
@@ -44,6 +49,15 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     WHERE r.status = 'ok' GROUP BY u.id ORDER BY n DESC LIMIT 200`).all() : []);
 
   r.get("/api/referral/rules", (req, res) => res.set("Cache-Control", "no-store").json(settings()));
+  // Public monthly report: ad income received, the share, the pool, how many members shared it and their total sign-ups.
+  r.get("/api/referral/report", (req, res) => {
+    const months = db.prepare(`SELECT m.month, m.income, m.direct, m.network, m.share, m.pool, m.created_at,
+      (SELECT COUNT(*) FROM q_ref_payouts p WHERE p.month = m.month) AS people,
+      (SELECT IFNULL(SUM(signups), 0) FROM q_ref_payouts p WHERE p.month = m.month) AS signups,
+      (SELECT COUNT(*) FROM q_ref_payouts p WHERE p.month = m.month AND p.status = 'paid') AS paid
+      FROM q_ref_months m ORDER BY m.month DESC LIMIT 36`).all();
+    res.set("Cache-Control", "no-store").json({ ...settings(), months });
+  });
   // ---------- member ----------
   function member(req, res, next) {
     if (!hasUsers()) return bad(res, "Please log in again.", 401);
@@ -107,15 +121,20 @@ CREATE TABLE IF NOT EXISTS q_kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Work out one month: pool = income × share; split by qualifying sign-ups among members who reached the target.
   // Running it again for the same month replaces the amounts not yet paid.
   r.post("/api/admin/referral/month", owner, (req, res) => {
-    const b = req.body || {}, month = String(b.month || ""), income = rupees(Number(b.income));
+    const b = req.body || {}, month = String(b.month || "");
+    const num = v => (v === "" || v == null ? null : rupees(Number(v)));
+    const direct = num(b.direct), network = num(b.network);
+    if ((direct != null && !(direct >= 0)) || (network != null && !(network >= 0))) return bad(res, "Please type the amounts in rupees.");
+    const income = direct != null || network != null ? rupees((direct || 0) + (network || 0)) : rupees(Number(b.income));
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return bad(res, "Please choose the month.");
     if (!(income >= 0)) return bad(res, "Please type the month's ad income in rupees.");
     const s = settings(), pool = rupees(income * s.share / 100);
     const winners = leaders().filter(u => u.status === "ok" && u.n >= s.target);
     const total = winners.reduce((a, u) => a + u.n, 0);
     db.transaction(() => {
-      db.prepare("INSERT INTO q_ref_months(month, income, share, pool, created_at) VALUES(?,?,?,?,?) ON CONFLICT(month) DO UPDATE SET income=excluded.income, share=excluded.share, pool=excluded.pool")
-        .run(month, income, s.share, pool, now());
+      db.prepare(`INSERT INTO q_ref_months(month, income, direct, network, share, pool, created_at) VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(month) DO UPDATE SET income=excluded.income, direct=excluded.direct, network=excluded.network, share=excluded.share, pool=excluded.pool`)
+        .run(month, income, direct, network, s.share, pool, now());
       db.prepare("DELETE FROM q_ref_payouts WHERE month = ? AND status = 'due'").run(month);
       const paidAlready = new Set(db.prepare("SELECT user_id FROM q_ref_payouts WHERE month = ?").all(month).map(x => x.user_id));
       for (const u of winners) if (!paidAlready.has(u.id))

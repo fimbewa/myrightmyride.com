@@ -71,6 +71,13 @@ test("referral pages, progress, payment details and monthly share", async () => 
   assert.equal(a.payouts.find(p => p.username === "asha").amount, 300);
   assert.equal(a.payouts.find(p => p.username === "asha").status, "paid");
   assert.equal(a.payouts.find(p => p.username === "ravi").amount, 800);
+  // advertisers + Google, shown publicly
+  await call("POST", "/api/admin/referral/month", { month: "2026-12", direct: 4000, network: 2000 }, { token: owner });
+  const rep = (await call("GET", "/api/referral/report")).data.months;
+  const dec = rep.find(m => m.month === "2026-12"), nov = rep.find(m => m.month === "2026-11");
+  assert.equal(dec.income, 6000); assert.equal(dec.direct, 4000); assert.equal(dec.network, 2000);
+  assert.equal(dec.pool, 600); assert.equal(dec.people, 2); assert.equal(dec.signups, 9);
+  assert.equal(nov.paid, 1);
   const mine = (await call("GET", "/api/referral/me", null, { token: ta })).data.payouts;
-  assert.equal(mine[0].status, "paid");
+  assert.equal(mine.find(p => p.month === "2026-11").status, "paid");
 });
