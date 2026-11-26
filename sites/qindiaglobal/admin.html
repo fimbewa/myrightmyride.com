@@ -63,12 +63,30 @@
       <div class="stat"><b id="sWall">0</b>wall lines to check</div>
       <div class="stat"><b id="sBans">0</b>blocked senders</div>
     </div>
-    <p class="small-note">Visitors do not create accounts or log in on qindiaglobal.com: each pledge and each message is one record below. Email/phone is kept only when the person ticked the consent box.</p>
+    <p class="small-note">Pledges and messages need no account: each pledge and each message is one record below (Community members are in the Community section). Email/phone is kept only when the person ticked the consent box.</p>
     <div class="tools">
       <button class="small-btn" data-export="pledges">Download pledges (Excel/CSV)</button>
       <button class="small-btn" data-export="messages">Download messages (Excel/CSV)</button>
       <button class="small-btn" id="refresh">Refresh</button>
     </div>
+    <h2 id="community">Community</h2>
+    <p class="small-note">People's accounts, posts and private messages at <a href="/community" target="_blank">qindiaglobal.com/community</a>. Clean text posts show at once. Photo posts (when the switch below is on), doubtful posts and posts reported by 3 people wait here. You never see private messages, except one that the receiver reported.</p>
+    <div class="stats">
+      <div class="stat"><b id="cUsers">0</b>members</div>
+      <div class="stat"><b id="cUsersToday">0</b>new members today</div>
+      <div class="stat"><b id="cPosts">0</b>posts</div>
+      <div class="stat"><b id="cPostsToday">0</b>posts today</div>
+      <div class="stat"><b id="cMsgsToday">0</b>private messages today</div>
+      <div class="stat"><b id="cDisk">0</b>photos MB / free GB</div>
+    </div>
+    <label style="display:flex;gap:10px;align-items:center;margin:8px 0 14px"><input type="checkbox" id="cPhotoApproval" style="width:auto"> Photos wait for my approval before everyone sees them (recommended while the community is small)</label>
+    <h3>Waiting for you</h3>
+    <div id="cPending"></div>
+    <h3>Reports</h3>
+    <div id="cReports"></div>
+    <h3>Members</h3>
+    <input id="cSearch" placeholder="Search username or name" style="margin-bottom:10px">
+    <div style="overflow-x:auto"><table class="tbl" id="cPeople"></table></div>
     <h2 id="write">Write a blog post</h2>
     <p class="small-note">Your post goes on qindiaglobal.com/blog at once when you tap <b>Publish</b>. You can write up to <b>2,50,000 characters</b> (any language). Leave an empty line between paragraphs. Start a line with <b>#</b> and a space for a heading, or <b>-</b> and a space for a list. Web links become clickable.</p>
     <form id="postForm">
@@ -150,7 +168,64 @@ async function load() {
   const names = {}; (window.QI_LANGS || []).forEach(([c, n]) => { names[c] = n; });
   fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
   loadPosts().catch(() => {});
+  loadCommunity().catch(() => {});
 }
+// ---------- community moderation ----------
+const cAct = async (body) => { await api("/api/admin/community", { method: "POST", body: JSON.stringify(body) }); loadCommunity(); };
+function cItem(meta, who, text, photo, buttons) {
+  const it = el("div", "item");
+  it.append(el("div", "meta", meta));
+  if (who) { const a = el("a", null, "@" + who); a.href = "/community#/u/" + who; a.target = "_blank"; it.append(a); }
+  if (text) it.append(el("p", null, text));
+  if (photo) { const img = el("img"); img.src = photo; img.alt = ""; img.style.cssText = "max-width:100%;max-height:320px;border-radius:10px;display:block;margin:6px 0"; it.append(img); }
+  const tools = el("div", "tools");
+  buttons.forEach(([label, body, sure]) => {
+    const b = el("button", "small-btn", label);
+    b.onclick = () => { if (sure && !b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again: " + label; return; } cAct(body); };
+    tools.append(b);
+  });
+  it.append(tools); return it;
+}
+async function loadCommunity() {
+  const q = $("cSearch").value.trim();
+  const d = await (await api("/api/admin/community?q=" + encodeURIComponent(q))).json();
+  $("cUsers").textContent = d.users; $("cUsersToday").textContent = d.usersToday; $("cPosts").textContent = d.posts; $("cPostsToday").textContent = d.postsToday;
+  $("cMsgsToday").textContent = d.messagesToday; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
+  const pend = $("cPending"); pend.replaceChildren();
+  d.pendingPosts.forEach(p => pend.append(cItem("Post · " + when(p.at) + (p.reports ? " · " + p.reports + " report(s)" : ""), p.username, p.text, p.photo,
+    [["Approve", { action: "post-ok", id: p.id }], ["Hide", { action: "post-hide", id: p.id }], ["Delete", { action: "post-delete", id: p.id }, true]])));
+  d.pendingComments.forEach(c => pend.append(cItem("Comment · " + when(c.at) + (c.reports ? " · " + c.reports + " report(s)" : ""), c.username, c.text, null,
+    [["Approve", { action: "comment-ok", id: c.id }], ["Delete", { action: "comment-delete", id: c.id }, true]])));
+  if (!pend.children.length) pend.append(el("p", null, "Nothing waiting."));
+  const rep = $("cReports"); rep.replaceChildren();
+  const KINDS = { post: "Post", comment: "Comment", user: "Profile", message: "Private message" };
+  d.reports.forEach(r => {
+    const i = r.item || {}, meta = KINDS[r.kind] + " · reported " + r.count + " time(s) · " + when(r.at) + (r.reasons ? " · " + r.reasons : "") + (i.status ? " · now: " + i.status : "");
+    const btns = [];
+    if (r.kind === "post") btns.push(["Keep (it is fine)", { action: "post-ok", id: r.id }], ["Hide", { action: "post-hide", id: r.id }], ["Delete", { action: "post-delete", id: r.id }, true]);
+    if (r.kind === "comment") btns.push(["Keep", { action: "comment-ok", id: r.id }], ["Delete", { action: "comment-delete", id: r.id }, true]);
+    if (r.kind === "message") btns.push(["Delete message", { action: "message-delete", id: r.id }, true]);
+    if (r.kind === "user") btns.push(["Ban this person", { action: "ban", id: r.id }, true]);
+    btns.push(["Close report", { action: "dismiss", kind: r.kind, id: r.id }]);
+    rep.append(cItem(meta, i.username, i.text || (r.item ? "" : "(already removed)"), i.photo, btns));
+  });
+  if (!d.reports.length) rep.append(el("p", null, "No open reports."));
+  const t = $("cPeople"); t.replaceChildren();
+  const head = el("tr"); ["Username", "Name", "City", "Joined", "Posts", "Reports", "Status", ""].forEach(x => head.append(el("th", null, x))); t.append(head);
+  d.people.forEach(u => {
+    const tr = el("tr");
+    [ "@" + u.username, u.name, u.city || "", when(u.created_at), String(u.posts), String(u.reports), u.status === "banned" ? "Banned" : "OK"].forEach(c => tr.append(el("td", null, c)));
+    const td = el("td"), b = el("button", "small-btn", u.status === "banned" ? "Unban" : "Ban");
+    b.onclick = () => { if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again"; return; } cAct({ action: u.status === "banned" ? "unban" : "ban", id: u.id }); };
+    td.append(b);
+    if (u.status === "banned") { const del = el("button", "small-btn", "Delete account"); del.onclick = () => { if (!del.dataset.sure) { del.dataset.sure = "1"; del.textContent = "Tap again to delete"; return; } cAct({ action: "user-delete", id: u.id }); }; td.append(" ", del); }
+    tr.append(td); t.append(tr);
+  });
+  if (!d.people.length) { const tr = el("tr"); const td = el("td", null, "No members yet."); td.colSpan = 8; tr.append(td); t.append(tr); }
+}
+let cT = null;
+$("cSearch").oninput = () => { clearTimeout(cT); cT = setTimeout(() => loadCommunity().catch(() => {}), 300); };
+$("cPhotoApproval").onchange = e => cAct({ action: "photo-approval", on: e.target.checked });
 $("loginForm").onsubmit = async e => {
   e.preventDefault(); $("loginMsg").textContent = "";
   const res = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: e.target.password.value }) }).catch(() => null);
