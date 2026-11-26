@@ -88,6 +88,9 @@
     <h3>Members</h3>
     <input id="cSearch" placeholder="Search username or name" style="margin-bottom:10px">
     <div style="overflow-x:auto"><table class="tbl" id="cPeople"></table></div>
+    <h3 id="signin">Sign in with Google and Facebook</h3>
+    <p class="small-note">Paste the keys you make on Google and Facebook. The buttons appear on the Community log-in page as soon as you tap Save. To switch one off, empty both boxes and tap Save. Members share only their name with us, never their email or friends.</p>
+    <div id="oauthBox"></div>
     <h2 id="write">Write a blog post</h2>
     <p class="small-note">Your post goes on qindiaglobal.com/blog at once when you tap <b>Publish</b>. You can write up to <b>2,50,000 characters</b> (any language). Leave an empty line between paragraphs. Start a line with <b>#</b> and a space for a heading, or <b>-</b> and a space for a list. Web links become clickable.</p>
     <form id="postForm">
@@ -188,6 +191,26 @@ async function load() {
   loadPosts().catch(() => {});
   loadCommunity().catch(() => {});
   loadLegal().catch(() => {});
+  loadOauth().catch(() => {});
+}
+// ---------- sign in with Google / Facebook ----------
+async function loadOauth() {
+  const d = await (await api("/api/admin/oauth")).json(), box = $("oauthBox"); box.replaceChildren();
+  const NAMES = { google: ["Google", "Client ID", "Client secret"], facebook: ["Facebook", "App ID", "App secret"] };
+  Object.entries(d).forEach(([p, c]) => {
+    const [label, idName, secName] = NAMES[p] || [p, "ID", "Secret"];
+    const it = el("div", "item");
+    it.append(el("b", null, label + ": " + (c.on ? "ON (" + c.members + " members joined this way)" : "off")));
+    it.append(el("div", "meta", "Address to give " + label + " (redirect URI):"));
+    const uri = el("input"); uri.readOnly = true; uri.value = c.redirect; uri.onclick = () => uri.select(); it.append(uri);
+    const f = el("form"); f.style.marginTop = "8px";
+    const id = el("input"); id.placeholder = idName; id.value = c.id || ""; id.autocomplete = "off";
+    const sec = el("input"); sec.placeholder = c.on ? secName + " (saved; leave empty to keep it)" : secName; sec.autocomplete = "off"; sec.type = "password";
+    const msg = el("p", "msg"), save = el("button", "small-btn", "Save");
+    f.append(id, sec, save, msg);
+    f.onsubmit = async e => { e.preventDefault(); msg.className = "msg"; try { await api("/api/admin/oauth", { method: "POST", body: JSON.stringify({ provider: p, id: id.value, secret: sec.value }) }); loadOauth(); } catch (err) { msg.textContent = err.message; msg.classList.add("bad"); } };
+    it.append(f); box.append(it);
+  });
 }
 async function loadLegal() {
   const d = await (await api("/api/admin/legal")).json(), f = $("legalForm");
