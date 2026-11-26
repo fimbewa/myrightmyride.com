@@ -73,6 +73,14 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   db.exec("CREATE INDEX IF NOT EXISTS s_users_ref ON s_users(ref_by)");
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
   fs.mkdirSync(MEDIA, { recursive: true });
+  // IT Intermediary Rules 2021, rule 3(1)(g)/(h): what the owner removes, and the sign-up details of closed
+  // accounts, are kept out of sight for 180 days (for complaints and lawful requests), then erased.
+  const hold = require("./qindia-legal").legalHold(db, MEDIA);
+  // IT Intermediary Rules 2021, rule 3(1)(c): remind every member of the rules at least once every three months
+  // and whenever the rules change. RULES_DATE is the "last updated" date of /legal/terms.
+  if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "rules_seen")) db.exec("ALTER TABLE s_users ADD COLUMN rules_seen INTEGER");
+  const RULES_DATE = Date.UTC(2026, 10, 26), REMIND_MS = 90 * 24 * 3600_000;
+  const rulesDue = u => !u.rules_seen || u.rules_seen < RULES_DATE || Date.now() - u.rules_seen > REMIND_MS;
 
   const r = express.Router();
   const now = () => Date.now();
@@ -137,6 +145,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const refBy = (db.prepare("SELECT id FROM s_users WHERE username = ? AND status = 'ok'").get(String(b.ref || "").toLowerCase().replace(/^@/, "")) || {}).id || null;
     const id = db.prepare("INSERT INTO s_users(username, name, city, pass_salt, pass_hash, rec_salt, rec_hash, ip_hash, created_at, last_seen, ref_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
       .run(username, name, line(b.city, 60) && !isBad(b.city) ? line(b.city, 60) : null, salt, scrypt(pw, salt), rsalt, scrypt(normRec(rec), rsalt), h, now(), now(), refBy).lastInsertRowid;
+    db.prepare("UPDATE s_users SET rules_seen = ? WHERE id = ?").run(now(), id); // agreed to the rules just now
     res.json({ token: newSession(id), recovery: rec, user: { username, name } });
   });
 
@@ -171,8 +180,10 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
       messages: unreadChats(me.id),
+      rulesDue: rulesDue(me),
     });
   });
+  r.post("/api/s/rules-seen", login, (req, res) => { db.prepare("UPDATE s_users SET rules_seen = ? WHERE id = ?").run(now(), req.me.id); res.json({ ok: true }); });
 
   r.post("/api/s/me", login, (req, res) => {
     const b = req.body || {}, me = req.me;
@@ -206,7 +217,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     deleteUser(me.id);
     res.json({ ok: true });
   });
-  function deleteUser(id) {
+  function deleteUser(id, reason = "account deleted by the member") {
+    const u = db.prepare("SELECT id, username, name, city, status, ip_hash, created_at, last_seen FROM s_users WHERE id = ?").get(id);
+    if (u) hold.keep("account", u.id, u, { reason });
     const files = db.prepare("SELECT name FROM s_media WHERE user_id = ?").all(id).map(x => x.name);
     db.transaction(() => {
       for (const c of db.prepare("SELECT DISTINCT post_id FROM s_comments WHERE user_id = ?").all(id)) db.prepare("UPDATE s_posts SET comments = MAX(0, comments - (SELECT COUNT(*) FROM s_comments WHERE post_id = ? AND user_id = ?)) WHERE id = ?").run(c.post_id, id, c.post_id);
@@ -584,10 +597,23 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     switch (act) {
       case "post-ok": db.prepare("UPDATE s_posts SET status = 'ok', reports = 0 WHERE id = ?").run(id); finish("post", id); break;
       case "post-hide": db.prepare("UPDATE s_posts SET status = 'hidden' WHERE id = ?").run(id); finish("post", id); break;
-      case "post-delete": { const p = db.prepare("SELECT photo FROM s_posts WHERE id = ?").get(id); db.prepare("DELETE FROM s_posts WHERE id = ?").run(id); if (p) dropMedia(p.photo); finish("post", id); break; }
+      case "post-delete": {
+        const p = db.prepare("SELECT p.id, p.text, p.photo, p.created_at, u.username FROM s_posts p JOIN s_users u ON u.id = p.user_id WHERE p.id = ?").get(id);
+        db.prepare("DELETE FROM s_posts WHERE id = ?").run(id);
+        if (p) { const kept = hold.keep("post", p.id, p, { photo: p.photo, reason: "removed by owner" }); if (kept) db.prepare("DELETE FROM s_media WHERE name = ?").run(kept); else dropMedia(p.photo); }
+        finish("post", id); break;
+      }
       case "comment-ok": { db.prepare("UPDATE s_comments SET status = 'ok', reports = 0 WHERE id = ?").run(id); const c = db.prepare("SELECT post_id FROM s_comments WHERE id = ?").get(id); if (c) recount(c.post_id); finish("comment", id); break; }
-      case "comment-delete": { const c = db.prepare("SELECT post_id FROM s_comments WHERE id = ?").get(id); db.prepare("DELETE FROM s_comments WHERE id = ?").run(id); if (c) recount(c.post_id); finish("comment", id); break; }
-      case "message-delete": { const m = db.prepare("SELECT photo FROM s_messages WHERE id = ? AND reported = 1").get(id); if (m) { db.prepare("DELETE FROM s_messages WHERE id = ?").run(id); dropMedia(m.photo); } finish("message", id); break; }
+      case "comment-delete": { const c = db.prepare("SELECT c.id, c.post_id, c.text, c.created_at, u.username FROM s_comments c JOIN s_users u ON u.id = c.user_id WHERE c.id = ?").get(id); if (c) hold.keep("comment", c.id, c, { reason: "removed by owner" }); db.prepare("DELETE FROM s_comments WHERE id = ?").run(id); if (c) recount(c.post_id); finish("comment", id); break; }
+      case "message-delete": {
+        const m = db.prepare("SELECT m.id, m.text, m.photo, m.created_at, u.username FROM s_messages m JOIN s_users u ON u.id = m.sender_id WHERE m.id = ? AND m.reported = 1").get(id);
+        if (m) {
+          db.prepare("DELETE FROM s_messages WHERE id = ?").run(id);
+          const kept = hold.keep("message", m.id, m, { photo: m.photo, reason: "reported message removed by owner" });
+          if (kept) db.prepare("DELETE FROM s_media WHERE name = ?").run(kept); else dropMedia(m.photo);
+        }
+        finish("message", id); break;
+      }
       case "dismiss": finish(String(b.kind || ""), id); break;
       case "ban": case "unban": {
         const u = db.prepare("SELECT * FROM s_users WHERE id = ?").get(id);
@@ -596,7 +622,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
         if (act === "ban") { db.prepare("DELETE FROM s_sessions WHERE user_id = ?").run(id); finish("user", id); }
         break;
       }
-      case "user-delete": deleteUser(id); finish("user", id); break;
+      case "user-delete": deleteUser(id, "account closed by owner"); finish("user", id); break;
       case "photo-approval": db.prepare("INSERT INTO s_settings(k, v) VALUES('photoApproval', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(JSON.stringify(!!b.on)); break;
       default: return bad(res, "Unknown action.");
     }
