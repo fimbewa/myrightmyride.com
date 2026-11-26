@@ -30,7 +30,7 @@
   }
   function own(box, ad, label) {
     const wrap = document.createElement("aside"); wrap.className = "qi-ad-box"; wrap.setAttribute("aria-label", "Advertisement");
-    const a = document.createElement("a"); a.href = ad.go; a.target = "_blank"; a.rel = "sponsored noopener";
+    const a = document.createElement("a"); a.href = ad.go; if (!ad.house) { a.target = "_blank"; a.rel = "sponsored noopener"; }
     if (ad.img) { const img = document.createElement("img"); img.src = ad.img; img.alt = ad.title; img.loading = "lazy"; a.append(img); }
     const inner = document.createElement("div"); inner.className = "qi-ad-in";
     const b = document.createElement("b"); b.textContent = ad.title; inner.append(b);

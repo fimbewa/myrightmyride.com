@@ -147,8 +147,9 @@ async function load() {
     const it = el("div", "item" + (a.status === "rejected" || a.status === "paused" ? " off" : ""));
     const top = el("div", "meta"); const b = el("span", "badge " + a.status, ST[a.status] || a.status);
     let extra = a.status === "active" && !live(a) ? (a.ends && a.ends < data.today ? " (dates over)" : " (starts " + a.starts + ")") : "";
-    top.append(b, " " + extra + " · " + (a.source === "advertiser" ? "From advertiser" : "Added by you") + " · " + when(a.created_at));
+    top.append(b, " " + extra + " · " + ({ advertiser: "From advertiser", house: "Join-us ad (shows when no paid ad runs)" }[a.source] || "Added by you") + " · " + when(a.created_at));
     it.append(top);
+    if (!a.image_type && a.img_url) { const img = el("img"); img.alt = ""; img.src = a.img_url; it.append(img); }
     if (a.image_type) { const img = el("img"); img.alt = ""; it.append(img); api("/api/admin/ads/" + a.id + "/img").then(r => r.blob()).then(bl => { img.src = URL.createObjectURL(bl); }).catch(() => {}); }
     it.append(el("p", null, a.title)); if (a.text) it.append(el("div", "meta", a.text));
     const lk = el("a", null, a.link); lk.href = a.link; lk.target = "_blank"; lk.rel = "noopener nofollow"; const lp = el("p"); lp.append(lk); it.append(lp);
@@ -188,7 +189,7 @@ $("adForm").image.onchange = async () => {
 };
 $("adForm").onsubmit = async e => {
   e.preventDefault(); const f = e.target, msg = $("adMsg"); msg.className = "msg"; msg.textContent = "Saving…";
-  let link = f.link.value.trim(); if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+  let link = f.link.value.trim(); if (link && !link.startsWith("/") && !/^https?:\/\//i.test(link)) link = "https://" + link;
   const body = { advertiser: f.advertiser.value, contact: f.contact.value, title: f.title.value, text: f.text.value, link, starts: f.starts.value, ends: f.ends.value,
     price: f.price.value, paid: f.paid.value, weight: f.weight.value, note: f.note.value, slots: [...f.querySelectorAll("[name=slots]:checked")].map(i => i.value), image };
   if (editing) body.action = "save";

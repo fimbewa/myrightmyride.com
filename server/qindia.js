@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
   r.use(require("./qindia-social")(db, { human, ipHash, banned, limited, owner }));
   r.get(["/community", "/community/"], (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(DIR, "community.html")));
   r.use(require("./qindia-ads")(db, { human, isBad })); // advertising: own ads + optional Google AdSense
+  r.use(require("./qindia-team")(db, { human, isBad })); // Careers: volunteer / Q India Reporter applications
   r.use("/api", (req, res) => bad(res, "Not found.", 404));
 
   // ---------- the website ----------
