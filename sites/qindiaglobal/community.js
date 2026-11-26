@@ -280,6 +280,14 @@
     await loadMore(list, b => `/api/s/feed?tab=${tab}&before=${b}`, d => d.posts.map(p => postCard(p)),
       tab === "following" ? h("div", { cls: "empty" }, h("p", { text: "Nothing here yet. Follow people to see their posts, or look at everyone's posts." }), h("a", { cls: "sbtn", href: "#/all" }, "See everyone"), " ", h("a", { cls: "sbtn", href: "#/search" }, "Find people"))
         : h("p", { cls: "empty", text: "No posts yet. Be the first to share something!" }));
+    feedAd(list);
+  }
+  // One ad box in the feed, after the third post (always marked "Ad"; filled by /ads.js, hidden when there is no ad).
+  function feedAd(list) {
+    const posts = list.querySelectorAll("article.post");
+    if (posts.length < 3 || list.querySelector(".qi-ad")) return;
+    posts[2].after(h("div", { cls: "qi-ad", "data-slot": "feed" }));
+    document.body.append(h("script", { src: "/ads.js" })); // ads.js looks for ad boxes each time it runs
   }
   // Fills a list page by page ("Show more" button at the end).
   async function loadMore(list, url, render, emptyNode, before = 2 ** 53) {
