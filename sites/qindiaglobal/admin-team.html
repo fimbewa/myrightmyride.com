@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qindiaglobal team applications (owner)</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+@media (min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;font-size:13px}
+.stat b{display:block;font-size:24px;color:var(--deep)}
+.item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.item.off{opacity:.6}
+.item .meta{font-size:13px;color:var(--muted)}
+.item p{margin:6px 0;overflow-wrap:anywhere}
+.item img{max-width:100%;max-height:180px;border-radius:10px;display:block;margin:6px 0}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;background:var(--bg)}
+.badge.pending{background:#fff3cd;color:#7a5600}.badge.active{background:#dcf5e3;color:var(--ok)}.badge.rejected{background:#fde2e1;color:var(--bad)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.small-note{font-size:13px;color:var(--muted);margin:0 0 12px}
+.small-btn{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.pick{display:flex;flex-wrap:wrap;gap:8px}
+.pick label{display:flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink)}
+.pick input{width:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+.tbl td,.tbl th{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start}.tbl th{background:var(--bg);font-size:12px;color:var(--muted)}
+.steps li{margin:6px 0}
+details.card summary{font-weight:700;cursor:pointer;color:var(--deep)}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap bar-in"><a class="brand" href="/admin"><b>Q</b>india<span>global</span></a><a class="small-btn" href="/admin">← Owner page</a></div></header>
+<main class="wrap block">
+  <section id="need" class="card" hidden>
+    <h2>Please log in first</h2>
+    <p>Open the owner page, log in, then tap <b>Team applications</b>.</p>
+    <p><a class="btn" href="/admin">Open owner page</a></p>
+  </section>
+  <section id="panel" hidden>
+    <h1 style="font-size:30px">Team applications</h1>
+    <p class="small-note">People apply at <a href="/careers" target="_blank">qindiaglobal.com/careers</a>. All roles are unpaid volunteer roles. Contact each person, then mark them <b>Contacted</b>, <b>Accepted</b> or <b>Declined</b>.</p>
+    <div class="stats" id="stats"></div>
+    <div class="tools"><button class="small-btn" id="csv">Download all (Excel/CSV)</button><button class="small-btn" id="refresh">Refresh</button></div>
+    <select id="filter" style="margin-bottom:10px"><option value="">All roles</option></select>
+    <div id="items"></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let tok = ""; try { tok = sessionStorage.getItem("qi_owner") || ""; } catch {}
+const ST = { new: "New", contacted: "Contacted", accepted: "Accepted", declined: "Declined" };
+const when = ms => new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json", authorization: "Bearer " + tok } });
+  if (res.status === 401) { $("panel").hidden = true; $("need").hidden = false; throw new Error("login"); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Server not reachable");
+  return res;
+}
+let data = null;
+async function load() {
+  data = await (await api("/api/admin/team")).json();
+  $("need").hidden = true; $("panel").hidden = false;
+  const st = $("stats"); st.replaceChildren();
+  const box = (n, label) => { const d = el("div", "stat"); d.append(el("b", null, String(n)), label); st.append(d); };
+  box(data.items.length, "applications"); box(data.items.filter(i => i.status === "new").length, "new, not contacted");
+  Object.entries(data.roles).forEach(([k, v]) => box((data.byRole.find(r => r.role === k) || { n: 0 }).n, v));
+  const fl = $("filter"); if (fl.options.length === 1) Object.entries(data.roles).forEach(([k, v]) => { const o = el("option", null, v); o.value = k; fl.append(o); });
+  draw();
+}
+function draw() {
+  const box = $("items"), f = $("filter").value; box.replaceChildren();
+  const rows = data.items.filter(i => !f || i.role === f);
+  if (!rows.length) box.append(el("p", null, "No applications yet. Share qindiaglobal.com/careers."));
+  rows.forEach(a => {
+    const it = el("div", "item" + (a.status === "declined" ? " off" : ""));
+    const top = el("div", "meta"); top.append(el("span", "badge " + (a.status === "new" ? "pending" : a.status === "accepted" ? "active" : a.status === "declined" ? "rejected" : ""), ST[a.status] || a.status), " " + (data.roles[a.role] || a.role) + " · " + when(a.created_at));
+    it.append(top, el("p", null, a.name + " · " + a.contact));
+    it.append(el("div", "meta", [a.city, a.country, a.languages, a.hours].filter(Boolean).join(" · ")));
+    if (a.about) { const p = el("p", null, a.about); p.style.whiteSpace = "pre-wrap"; it.append(p); }
+    const note = el("input"); note.placeholder = "Private note (saved when you leave the box)"; note.value = a.note || ""; note.maxLength = 1000;
+    note.onchange = () => api("/api/admin/team/" + a.id, { method: "POST", body: JSON.stringify({ note: note.value }) }).catch(() => {});
+    it.append(note);
+    const tools = el("div", "tools");
+    Object.entries(ST).filter(([k]) => k !== a.status).forEach(([k, label]) => { const b = el("button", "small-btn", "Mark " + label.toLowerCase()); b.onclick = async () => { await api("/api/admin/team/" + a.id, { method: "POST", body: JSON.stringify({ status: k }) }); load(); }; tools.append(b); });
+    const del = el("button", "small-btn", "Delete");
+    del.onclick = async () => { if (del.dataset.sure) { await api("/api/admin/team/" + a.id, { method: "POST", body: JSON.stringify({ action: "delete" }) }); load(); } else { del.dataset.sure = "1"; del.textContent = "Tap again to delete"; } };
+    tools.append(del); it.append(tools); box.append(it);
+  });
+}
+$("filter").onchange = draw;
+$("refresh").onclick = () => load().catch(() => {});
+$("csv").onclick = async () => {
+  const blob = await (await api("/api/admin/team.csv")).blob();
+  const a = el("a"); a.href = URL.createObjectURL(blob); a.download = "qindiaglobal-applications.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+if (tok) load().catch(() => {}); else $("need").hidden = false;
+</script>
+</body>
+</html>
