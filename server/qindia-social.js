@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Added later: who invited this member (referral link qindiaglobal.com/community?ref=<username>).
   if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "ref_by")) db.exec("ALTER TABLE s_users ADD COLUMN ref_by INTEGER");
   db.exec("CREATE INDEX IF NOT EXISTS s_users_ref ON s_users(ref_by)");
+  // Added later: sign in with Google / Facebook. pass_set = 0 for members who joined that way and never chose a password.
+  if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "pass_set")) db.exec("ALTER TABLE s_users ADD COLUMN pass_set INTEGER NOT NULL DEFAULT 1");
+  db.exec(`CREATE TABLE IF NOT EXISTS s_identities (
+  provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES s_users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL, PRIMARY KEY (provider, subject))`);
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
   fs.mkdirSync(MEDIA, { recursive: true });
   // IT Intermediary Rules 2021, rule 3(1)(g)/(h): what the owner removes, and the sign-up details of closed
@@ -180,7 +185,8 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
       messages: unreadChats(me.id),
-      rulesDue: rulesDue(me),
+      rulesDue: rulesDue(me), hasPassword: !!me.pass_set,
+      linked: db.prepare("SELECT provider FROM s_identities WHERE user_id = ?").all(me.id).map(x => x.provider),
     });
   });
   r.post("/api/s/rules-seen", login, (req, res) => { db.prepare("UPDATE s_users SET rules_seen = ? WHERE id = ?").run(now(), req.me.id); res.json({ ok: true }); });
@@ -202,10 +208,10 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 
   r.post("/api/s/password", login, (req, res) => {
     const b = req.body || {}, me = req.me;
-    if (!same(scrypt(String(b.old || ""), me.pass_salt), me.pass_hash)) return bad(res, "The current password is wrong.", 401);
+    if (me.pass_set && !same(scrypt(String(b.old || ""), me.pass_salt), me.pass_hash)) return bad(res, "The current password is wrong.", 401);
     if (String(b.password || "").length < 8) return bad(res, "The new password must be at least 8 characters.");
     const salt = crypto.randomBytes(16).toString("hex");
-    db.prepare("UPDATE s_users SET pass_salt = ?, pass_hash = ? WHERE id = ?").run(salt, scrypt(b.password, salt), me.id);
+    db.prepare("UPDATE s_users SET pass_salt = ?, pass_hash = ?, pass_set = 1 WHERE id = ?").run(salt, scrypt(b.password, salt), me.id);
     db.prepare("DELETE FROM s_sessions WHERE user_id = ? AND token_hash != ?").run(me.id, me.tokenHash);
     res.json({ ok: true });
   });
@@ -213,7 +219,10 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Delete my account: removes the profile, posts, comments, likes, follows, messages I sent and my photos.
   r.post("/api/s/delete-account", login, (req, res) => {
     const me = req.me;
-    if (!same(scrypt(String((req.body || {}).password || ""), me.pass_salt), me.pass_hash)) return bad(res, "The password is wrong.", 401);
+    const b = req.body || {};
+    // Members who joined with Google/Facebook and have no password confirm by typing their username.
+    if (me.pass_set ? !same(scrypt(String(b.password || ""), me.pass_salt), me.pass_hash) : String(b.confirm || "").trim().toLowerCase().replace(/^@/, "") !== me.username)
+      return bad(res, me.pass_set ? "The password is wrong." : "Please type your username to confirm.", 401);
     deleteUser(me.id);
     res.json({ ok: true });
   });
@@ -627,6 +636,155 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       default: return bad(res, "Unknown action.");
     }
     res.json({ ok: true });
+  });
+
+  // ---------- sign in with Google / Facebook (OAuth 2.0) ----------
+  // The owner pastes each provider's App/Client ID and secret on /admin (stored in s_settings). We ask only for the
+  // public profile (a stable account number and the name): no email, no friends, no posting on the person's behalf.
+  const PROVIDERS = {
+    google: {
+      label: "Google", scope: "openid profile",
+      auth: "https://accounts.google.com/o/oauth2/v2/auth",
+      async profile(code, cfg, redirect) {
+        const t = await postForm("https://oauth2.googleapis.com/token", { code, client_id: cfg.id, client_secret: cfg.secret, redirect_uri: redirect, grant_type: "authorization_code" });
+        const u = await getJson("https://openidconnect.googleapis.com/v1/userinfo", { authorization: "Bearer " + t.access_token });
+        return { subject: String(u.sub || ""), name: u.name || u.given_name || "" };
+      },
+    },
+    facebook: {
+      label: "Facebook", scope: "public_profile",
+      auth: "https://www.facebook.com/v21.0/dialog/oauth",
+      async profile(code, cfg, redirect) {
+        const t = await getJson("https://graph.facebook.com/v21.0/oauth/access_token?" + new URLSearchParams({ client_id: cfg.id, client_secret: cfg.secret, redirect_uri: redirect, code }));
+        const proof = crypto.createHmac("sha256", cfg.secret).update(t.access_token).digest("hex");
+        const u = await getJson("https://graph.facebook.com/v21.0/me?" + new URLSearchParams({ fields: "id,name", access_token: t.access_token, appsecret_proof: proof }));
+        return { subject: String(u.id || ""), name: u.name || "" };
+      },
+    },
+  };
+  async function getJson(url, headers = {}) {
+    const res = await fetch(url, { headers: { accept: "application/json", ...headers }, signal: AbortSignal.timeout(10000) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) throw new Error("provider said " + res.status + " " + JSON.stringify(d.error || "").slice(0, 200));
+    return d;
+  }
+  async function postForm(url, form) {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: new URLSearchParams(form), signal: AbortSignal.timeout(10000) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error || !d.access_token) throw new Error("provider said " + res.status + " " + String(d.error || "").slice(0, 100));
+    return d;
+  }
+  const oauthCfg = p => { const c = setting("oauth_" + p, null); return c && c.id && c.secret ? c : null; };
+  // One fixed web address per provider (without "www."), which the owner also gives to Google/Facebook.
+  const siteBase = req => process.env.QI_PUBLIC_URL || `${req.protocol}://${String(req.get("host") || "").replace(/^www\./i, "")}`;
+  const callbackUrl = (req, p) => `${siteBase(req)}/auth/${p}/callback`;
+  const states = new Map(), handoffs = new Map(); // short-lived, kept in memory (a restart only means "try again")
+  setInterval(() => { const t = now(); for (const m of [states, handoffs]) for (const [k, v] of m) if (v.until < t) m.delete(k); }, 60_000).unref();
+  const cookie = (req, name) => (new RegExp("(?:^|;\\s*)" + name + "=([a-f0-9]{32,64})").exec(req.get("cookie") || "") || [])[1] || "";
+  const toCommunity = (res, frag) => res.redirect(302, "/community#/" + frag);
+
+  r.get("/api/s/oauth", (req, res) => res.json(Object.fromEntries(Object.keys(PROVIDERS).map(p => [p, !!oauthCfg(p)]))));
+
+  r.get("/auth/:p/start", (req, res, next) => {
+    const P = PROVIDERS[req.params.p]; if (!P) return next();
+    const cfg = oauthCfg(req.params.p);
+    if (!cfg) return toCommunity(res, "oauth-error/off");
+    if (/^www\./i.test(req.get("host") || "") && !process.env.QI_PUBLIC_URL) return res.redirect(302, siteBase(req) + req.originalUrl);
+    if (limited(req, "oauth", 30, 3600_000)) return toCommunity(res, "oauth-error/busy");
+    const state = crypto.randomBytes(16).toString("hex");
+    const ref = /^[a-z0-9_.]{3,20}$/i.test(String(req.query.ref || "")) ? String(req.query.ref).toLowerCase() : "";
+    states.set(state, { p: req.params.p, ref, until: now() + 10 * 60_000 });
+    // The cookie ties the answer to this browser, so nobody can log someone else into their account.
+    res.set("Set-Cookie", `qi_oauth=${state}; Path=/auth; Max-Age=600; HttpOnly; SameSite=Lax${req.secure ? "; Secure" : ""}`);
+    res.redirect(302, P.auth + "?" + new URLSearchParams({ client_id: cfg.id, redirect_uri: callbackUrl(req, req.params.p), response_type: "code", scope: P.scope, state }));
+  });
+
+  r.get("/auth/:p/callback", async (req, res, next) => {
+    const p = req.params.p, P = PROVIDERS[p]; if (!P) return next();
+    res.set("Set-Cookie", `qi_oauth=; Path=/auth; Max-Age=0; HttpOnly; SameSite=Lax${req.secure ? "; Secure" : ""}`);
+    const state = String(req.query.state || ""), st = states.get(state);
+    states.delete(state);
+    if (req.query.error) return toCommunity(res, "oauth-error/cancel");
+    if (!st || st.p !== p || cookie(req, "qi_oauth") !== state) return toCommunity(res, "oauth-error/expired");
+    const cfg = oauthCfg(p); if (!cfg) return toCommunity(res, "oauth-error/off");
+    let prof;
+    try { prof = await P.profile(String(req.query.code || ""), cfg, callbackUrl(req, p)); }
+    catch (e) { console.log(`[sign-in ${p}] ${e.message}`); return toCommunity(res, "oauth-error/failed"); }
+    if (!prof.subject) return toCommunity(res, "oauth-error/failed");
+    const code = crypto.randomBytes(24).toString("hex");
+    const known = db.prepare("SELECT u.* FROM s_identities i JOIN s_users u ON u.id = i.user_id WHERE i.provider = ? AND i.subject = ?").get(p, prof.subject);
+    if (known) {
+      if (known.status === "banned") return toCommunity(res, "oauth-error/banned");
+      handoffs.set(code, { token: newSession(known.id), until: now() + 5 * 60_000 });
+    } else {
+      if (banned(ipHash(req))) return toCommunity(res, "oauth-error/banned");
+      handoffs.set(code, { pending: { p, subject: prof.subject, name: line(prof.name, 50), ref: st.ref }, ip: ipHash(req), until: now() + 30 * 60_000 });
+    }
+    toCommunity(res, "oauth/" + code);
+  });
+
+  // The page swaps the one-time code for a login, or (first time) for the details to finish joining.
+  const suggest = name => {
+    let base = String(name || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 16);
+    if (base.length < 3 || RESERVED.has(base) || isBad(base, false)) base = "member";
+    for (let i = 0; i < 50; i++) { const u = i ? base + "_" + crypto.randomInt(10, 9999) : base; if (!db.prepare("SELECT 1 FROM s_users WHERE username = ?").get(u)) return u; }
+    return "member_" + crypto.randomBytes(3).toString("hex");
+  };
+  r.post("/api/s/oauth/claim", (req, res) => {
+    const code = String((req.body || {}).code || ""), h = handoffs.get(code);
+    if (!h || h.until < now()) return bad(res, "This sign-in link has expired. Please try again.", 410);
+    if (h.token) { handoffs.delete(code); return res.json({ token: h.token }); }
+    const n = h.pending.name && !isBad(h.pending.name) ? h.pending.name : "";
+    res.json({ pending: { provider: PROVIDERS[h.pending.p].label, name: n, username: suggest(n) } });
+  });
+  r.post("/api/s/oauth/finish", (req, res) => {
+    const b = req.body || {}, code = String(b.code || ""), h = handoffs.get(code);
+    if (!h || !h.pending || h.until < now()) return bad(res, "This sign-in link has expired. Please try again.", 410);
+    const username = String(b.username || "").trim().toLowerCase().replace(/^@/, ""), name = line(b.name, 50);
+    if (!USERNAME_RX.test(username)) return bad(res, "Username: 3 to 20 small English letters, numbers, _ or . (for example ravi_patil).");
+    if (RESERVED.has(username) || isBad(username, false)) return bad(res, "Please choose another username.");
+    if (!name || isBad(name)) return bad(res, "Please write your name (no rude words, links or phone numbers).");
+    if (!(b.agree === true || b.agree === "on")) return bad(res, "Please tick that you are 18 or older and agree to the Terms.");
+    if (limited(req, "signup", 5, 24 * 3600_000)) return bad(res, "Too many new accounts from this connection today. Please try tomorrow.", 429);
+    if (db.prepare("SELECT 1 FROM s_users WHERE username = ?").get(username)) return bad(res, "This username is taken. Please choose another.", 409);
+    const { p, subject } = h.pending;
+    if (db.prepare("SELECT 1 FROM s_identities WHERE provider = ? AND subject = ?").get(p, subject)) return bad(res, "This account is already joined. Please sign in again.", 409);
+    const salt = crypto.randomBytes(16).toString("hex"), rsalt = crypto.randomBytes(16).toString("hex");
+    const ref = String(b.ref || h.pending.ref || "").toLowerCase().replace(/^@/, "");
+    const refBy = (db.prepare("SELECT id FROM s_users WHERE username = ? AND status = 'ok'").get(ref) || {}).id || null;
+    const id = db.transaction(() => {
+      const uid = db.prepare("INSERT INTO s_users(username, name, city, pass_salt, pass_hash, rec_salt, rec_hash, ip_hash, created_at, last_seen, ref_by, pass_set, rules_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?)")
+        .run(username, name, line(b.city, 60) && !isBad(b.city) ? line(b.city, 60) : null, salt, crypto.randomBytes(32).toString("hex"), rsalt, crypto.randomBytes(32).toString("hex"), h.ip || ipHash(req), now(), now(), refBy, now()).lastInsertRowid;
+      db.prepare("INSERT INTO s_identities(provider, subject, user_id, created_at) VALUES(?,?,?,?)").run(p, subject, uid, now());
+      return uid;
+    })();
+    handoffs.delete(code);
+    res.json({ token: newSession(id), user: { username, name } });
+  });
+  // A logged-in member can remove a linked Google/Facebook sign-in (only if a password is set, so they can still log in).
+  r.post("/api/s/oauth/unlink", login, (req, res) => {
+    const me = req.me, p = String((req.body || {}).provider || "");
+    const others = db.prepare("SELECT COUNT(*) AS n FROM s_identities WHERE user_id = ? AND provider != ?").get(me.id, p).n;
+    if (!me.pass_set && !others) return bad(res, "Please set a password first, so that you can still log in.");
+    db.prepare("DELETE FROM s_identities WHERE user_id = ? AND provider = ?").run(me.id, p);
+    res.json({ ok: true });
+  });
+
+  // Owner: paste the keys from Google Cloud / Meta for Developers. The secret is never sent back to the page.
+  r.get("/api/admin/oauth", owner, (req, res) => {
+    res.json(Object.fromEntries(Object.keys(PROVIDERS).map(p => { const c = setting("oauth_" + p, null); return [p, { on: !!oauthCfg(p), id: c ? c.id : "", redirect: callbackUrl(req, p), members: db.prepare("SELECT COUNT(*) AS n FROM s_identities WHERE provider = ?").get(p).n }]; })));
+  });
+  r.post("/api/admin/oauth", owner, (req, res) => {
+    const b = req.body || {}, p = String(b.provider || "");
+    if (!PROVIDERS[p]) return bad(res, "Unknown provider.");
+    const id = String(b.id || "").trim(), secret = String(b.secret || "").trim();
+    if (!id && !secret) { db.prepare("DELETE FROM s_settings WHERE k = ?").run("oauth_" + p); return res.json({ ok: true, on: false }); }
+    const old = setting("oauth_" + p, null);
+    const sec = secret || (old && old.id === id ? old.secret : "");
+    if (!/^[\w.\-]{5,200}$/.test(id)) return bad(res, "The ID does not look right. Copy it again.");
+    if (!/^[\w.\-]{8,200}$/.test(sec)) return bad(res, "The secret does not look right. Copy it again.");
+    db.prepare("INSERT INTO s_settings(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run("oauth_" + p, JSON.stringify({ id, secret: sec }));
+    res.json({ ok: true, on: true });
   });
 
   return r;
