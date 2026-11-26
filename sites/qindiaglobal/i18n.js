@@ -245,6 +245,7 @@ window.QI_T = {
     tagline: "नागरिकांचा उपक्रम. रांगेत राहा. सन्मानाने प्रवास करा."
   },
   gu: {
+    nav_song: "ગીત", songKicker: "અમારું શિસ્ત ગીત", songSub: "શિસ્તથી આગળ વધતું ભારત", song_play: "ગીત વગાડો", song_pause: "થોભો", song_resume: "ફરી વગાડો", song_restart: "શરૂઆતથી", song_noaudio: "તમારું બ્રાઉઝર ધૂન વગાડી શકતું નથી, પણ નીચેના શબ્દો વાંચીને તમે ગાઈ શકો છો.", songNote: "શબ્દો અને ધૂન મૌલિક છે અને સૌ માટે મફત છે, કોઈ કૉપિરાઇટ નથી (CC0). ધૂન તમારું બ્રાઉઝર જ વગાડે છે અને Play દબાવો ત્યારે જ શરૂ થાય છે.",
     f_wall: "સંકલ્પ દીવાલ માટે એક લીટી (વૈકલ્પિક)",
     wallH: "સંકલ્પ દીવાલ",
     wallLead: "સંકલ્પ લેનારાઓના શબ્દો.",
@@ -316,6 +317,7 @@ window.QI_T = {
     tagline: "નાગરિકોની પહેલ. કતારમાં રહો. સન્માનથી સવાર થાઓ."
   },
   bn: {
+    nav_song: "গান", songKicker: "আমাদের শৃঙ্খলার গান", songSub: "শৃঙ্খলায় এগিয়ে চলা ভারত", song_play: "গান চালান", song_pause: "থামান", song_resume: "আবার চালান", song_restart: "শুরু থেকে", song_noaudio: "আপনার ব্রাউজার সুর বাজাতে পারছে না, তবে নিচের কথাগুলো পড়ে আপনি গাইতে পারেন।", songNote: "কথা ও সুর মৌলিক এবং সবার জন্য বিনামূল্যে, কোনো কপিরাইট নেই (CC0)। সুরটি আপনার ব্রাউজারই বাজায় এবং Play চাপলে তবেই শুরু হয়।",
     f_wall: "অঙ্গীকার দেয়ালের জন্য একটি লাইন (ঐচ্ছিক)",
     wallH: "অঙ্গীকার দেয়াল",
     wallLead: "যাঁরা অঙ্গীকার করেছেন তাঁদের কথা।",
@@ -387,6 +389,7 @@ window.QI_T = {
     tagline: "নাগরিকদের উদ্যোগ। লাইনে দাঁড়ান। সম্মানের সাথে উঠুন।"
   },
   ta: {
+    nav_song: "பாடல்", songKicker: "எங்கள் ஒழுக்கப் பாடல்", songSub: "ஒழுக்கத்தால் முன்னேறும் இந்தியா", song_play: "பாடலை இயக்கு", song_pause: "நிறுத்து", song_resume: "மீண்டும் இயக்கு", song_restart: "தொடக்கத்திலிருந்து", song_noaudio: "உங்கள் உலாவியால் இசையை இயக்க முடியவில்லை, ஆனால் கீழே உள்ள வரிகளைப் படித்துப் பாடலாம்.", songNote: "வரிகளும் இசையும் சொந்த படைப்பு, அனைவருக்கும் இலவசம், பதிப்புரிமை இல்லை (CC0). இசையை உங்கள் உலாவியே இயக்குகிறது, Play அழுத்தினால் மட்டுமே தொடங்கும்.",
     f_wall: "உறுதிமொழிச் சுவருக்கு ஒரு வரி (விருப்பம்)",
     wallH: "உறுதிமொழிச் சுவர்",
     wallLead: "உறுதிமொழி எடுத்தவர்களின் வார்த்தைகள்.",
@@ -458,6 +461,7 @@ window.QI_T = {
     tagline: "குடிமக்களின் முன்னெடுப்பு. வரிசையில் நில்லுங்கள். கண்ணியத்துடன் ஏறுங்கள்."
   },
   te: {
+    nav_song: "పాట", songKicker: "మా క్రమశిక్షణ పాట", songSub: "క్రమశిక్షణతో ముందుకు సాగే భారత్", song_play: "పాట ప్లే చేయండి", song_pause: "ఆపండి", song_resume: "మళ్ళీ ప్లే చేయండి", song_restart: "మొదటి నుండి", song_noaudio: "మీ బ్రౌజర్ రాగాన్ని ప్లే చేయలేదు, కానీ కింది పదాలు చదివి మీరు పాడవచ్చు.", songNote: "పదాలు, రాగం సొంతవి, అందరికీ ఉచితం, కాపీరైట్ లేదు (CC0). రాగాన్ని మీ బ్రౌజరే వాయిస్తుంది, Play నొక్కినప్పుడే మొదలవుతుంది.",
     f_wall: "ప్రతిజ్ఞ గోడ కోసం ఒక వాక్యం (ఐచ్ఛికం)",
     wallH: "ప్రతిజ్ఞ గోడ",
     wallLead: "ప్రతిజ్ఞ చేసినవారి మాటలు.",
@@ -529,6 +533,7 @@ window.QI_T = {
     tagline: "పౌరుల చొరవ. వరుసలో నిలబడండి. గౌరవంగా ఎక్కండి."
   },
   es: {
+    nav_song: "Canción", songKicker: "Nuestra canción de la disciplina", songSub: "India avanza con disciplina", song_play: "Escuchar la canción", song_pause: "Pausa", song_resume: "Seguir", song_restart: "Desde el inicio", song_noaudio: "Tu navegador no puede tocar la melodía, pero puedes leer y cantar la letra de abajo.", songNote: "La letra y la melodía son originales y libres para todos, sin derechos de autor (CC0). La melodía la toca tu navegador y solo empieza al pulsar Play.",
     f_wall: "Una frase para el Muro de compromisos (opcional)",
     wallH: "Muro de compromisos",
     wallLead: "Palabras de quienes hicieron el compromiso.",
@@ -600,6 +605,7 @@ window.QI_T = {
     tagline: "Una iniciativa ciudadana. Haz la fila. Sube con dignidad."
   },
   fr: {
+    nav_song: "Chanson", songKicker: "Notre chanson de la discipline", songSub: "L'Inde avance avec discipline", song_play: "Écouter la chanson", song_pause: "Pause", song_resume: "Reprendre", song_restart: "Depuis le début", song_noaudio: "Votre navigateur ne peut pas jouer la mélodie, mais vous pouvez lire et chanter les paroles ci-dessous.", songNote: "Les paroles et la mélodie sont originales et libres pour tous, sans droits d'auteur (CC0). La mélodie est jouée par votre navigateur et ne démarre que si vous appuyez sur Play.",
     f_wall: "Une phrase pour le Mur des engagements (facultatif)",
     wallH: "Mur des engagements",
     wallLead: "Les mots de celles et ceux qui ont pris l'engagement.",
@@ -671,6 +677,7 @@ window.QI_T = {
     tagline: "Une initiative citoyenne. Faites la queue. Montez avec dignité."
   },
   ar: {
+    nav_song: "أغنية", songKicker: "أغنية الانضباط", songSub: "الهند تتقدم بالانضباط", song_play: "تشغيل الأغنية", song_pause: "إيقاف مؤقت", song_resume: "متابعة", song_restart: "من البداية", song_noaudio: "لا يستطيع متصفحك تشغيل اللحن، لكن يمكنك قراءة الكلمات أدناه وغناءها.", songNote: "الكلمات واللحن أصليان ومتاحان للجميع مجانًا، بلا حقوق نشر (CC0). يعزف متصفحك اللحن، ولا يبدأ إلا عند الضغط على Play.",
     f_wall: "سطر لجدار التعهدات (اختياري)",
     wallH: "جدار التعهدات",
     wallLead: "كلمات من الذين قدّموا التعهد.",
