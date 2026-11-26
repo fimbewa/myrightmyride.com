@@ -35,7 +35,7 @@ test("pages and files for ads are served", async () => {
     assert.match(t, /class="qi-ad" data-slot="/, p);
     assert.match(t, /src="\/ads\.js"/, p);
   }
-  assert.match((await call("GET", "/terms.html")).text, /AdSense/);
+  assert.match((await call("GET", "/legal/terms")).text, /AdSense/); // /terms.html now redirects here
   assert.equal((await call("GET", "/ads.txt")).status, 404); // no publisher ID yet
 });
 
