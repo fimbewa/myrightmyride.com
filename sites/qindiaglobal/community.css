@@ -1,0 +1,88 @@
+/* Q India Community (community.html). Uses the colours of site.css. */
+body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+.cm .wrap{max-width:640px}
+.cm-top{font-weight:700;text-decoration:none;color:var(--deep)}
+.cm-disc{font-size:12px;color:var(--muted);margin:8px auto 4px}
+.cm-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;justify-content:space-around;background:#fff;border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.cm-nav a{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;font-weight:600;color:var(--muted);text-decoration:none;padding:2px 0;min-width:0}
+.cm-nav a span{font-size:20px;line-height:1.2}
+.cm-nav a.on{color:var(--accent)}
+.cm-nav i{position:absolute;top:0;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font:700 11px/18px system-ui;text-align:center;padding:0 4px;font-style:normal}
+.cm-plus span{color:var(--accent);font-weight:800}
+.cm h1{font-size:24px;margin:14px 0 10px;color:var(--deep)}
+.cm .card{padding:16px;border-radius:16px;margin:10px 0}
+.cm form > *{margin-bottom:10px}
+.cm label{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+.cm .tick{display:flex;gap:10px;align-items:flex-start;font-weight:400}
+.cm .tick input{width:auto;margin-top:5px}
+.cm .msg{font-size:14px;min-height:1em;margin:6px 0}
+.cm .msg.bad{color:var(--bad)}.cm .msg.ok{color:var(--ok)}
+.cm .muted{color:var(--muted);font-size:14px}
+.cm .row{display:flex;align-items:center;gap:10px}
+.cm .grow{flex:1;min-width:0}
+.cm .sbtn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:7px 14px;cursor:pointer;text-decoration:none;display:inline-block}
+.cm .sbtn.main{background:var(--accent);border-color:var(--accent);color:#fff}
+.cm .sbtn.dark{background:var(--deep);border-color:var(--deep);color:#fff}
+.cm .sbtn:disabled{opacity:.6}
+.cm .tabs{display:flex;gap:6px;margin:10px 0}
+.cm .tabs a{flex:1;text-align:center;padding:8px;border-radius:999px;background:#fff;border:1px solid var(--line);text-decoration:none;font-weight:600;color:var(--muted)}
+.cm .tabs a.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.av{width:42px;height:42px;border-radius:50%;flex:none;background:var(--deep);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;object-fit:cover;text-transform:uppercase}
+.av.big{width:84px;height:84px;font-size:36px}
+.av.sm{width:32px;height:32px;font-size:14px}
+.who{text-decoration:none;color:var(--ink);min-width:0}
+.who b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who small{color:var(--muted);font-size:13px}
+.post{background:#fff;border:1px solid var(--line);border-radius:16px;margin:10px 0;overflow:hidden}
+.post .ph{padding:12px 14px 6px}
+.post .tx{padding:4px 14px 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.post .tx a{overflow-wrap:anywhere}
+.post img.pic{display:block;width:100%;max-height:80vh;object-fit:contain;background:#000}
+.post .acts{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--line)}
+.post .acts button,.post .acts a{flex:1;font:inherit;font-size:14px;font-weight:600;color:var(--muted);background:none;border:0;border-radius:10px;padding:8px 4px;cursor:pointer;text-decoration:none;text-align:center}
+.post .acts .on{color:var(--accent)}
+.post .wait{margin:0 14px 10px;font-size:13px;background:#fff4e5;color:#8a4b00;border-radius:10px;padding:6px 10px}
+.more{position:relative}
+.more-menu{position:absolute;right:0;top:100%;z-index:3;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.12);min-width:170px;overflow:hidden}
+.more-menu button{display:block;width:100%;text-align:start;font:inherit;font-size:14px;background:none;border:0;padding:10px 14px;cursor:pointer}
+.more-menu button:hover{background:var(--bg)}
+.dots{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--muted);cursor:pointer;padding:4px 8px}
+.compose textarea{min-height:90px;resize:vertical}
+.compose .prev{position:relative;margin-bottom:10px}
+.compose .prev img{max-width:100%;max-height:260px;border-radius:12px;display:block}
+.compose .prev button{position:absolute;top:6px;right:6px}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.prof{text-align:center;padding:18px 14px}
+.prof .bio{white-space:pre-wrap;margin:8px 0}
+.prof .nums{display:flex;justify-content:center;gap:22px;margin:10px 0}
+.prof .nums a,.prof .nums span{text-decoration:none;color:var(--ink);font-size:14px}
+.prof .nums b{display:block;font-size:18px}
+.prof .btns{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.list a.li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:14px;margin:8px 0;text-decoration:none;color:var(--ink)}
+.list .li .last{color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .li.unread .last{color:var(--ink);font-weight:700}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
+.tag{font-size:11px;font-weight:700;background:var(--bg);color:var(--muted);border-radius:999px;padding:2px 8px}
+.cmt{display:flex;gap:8px;margin:10px 0}
+.cmt .bub{background:#fff;border:1px solid var(--line);border-radius:14px;padding:8px 12px;min-width:0;flex:1}
+.cmt .bub p{margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat{display:flex;flex-direction:column;height:calc(100dvh - 210px);min-height:320px}
+.chat .head{display:flex;align-items:center;gap:10px;padding:8px 0}
+.chat .msgs{flex:1;overflow-y:auto;background:#efeae2;border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.bubble{max-width:80%;padding:7px 10px 4px;border-radius:12px;background:#fff;align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.bubble.me{align-self:flex-end;background:#d9fdd3}
+.bubble img{max-width:100%;border-radius:8px;display:block;margin-bottom:4px}
+.bubble small{display:block;text-align:end;font-size:11px;color:var(--muted)}
+.chat form{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
+.chat textarea{min-height:44px;max-height:140px;resize:none;margin:0}
+.day{align-self:center;font-size:12px;background:#fff;border-radius:8px;padding:2px 10px;color:var(--muted)}
+.note{background:#fff4e5;color:#8a4b00;border-radius:12px;padding:8px 12px;font-size:14px;margin:8px 0}
+.code{font:700 20px/1.4 ui-monospace,monospace;letter-spacing:1px;background:var(--bg);border-radius:12px;padding:10px;text-align:center;user-select:all}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+.loadmore{display:block;margin:12px auto}
+.cm .msg:empty{display:none}
+.chat .head > .sbtn{flex:0 0 auto;width:auto}
+.chat .head > .who{flex:1 1 auto}
+.chat form .filebtn{flex:none;padding:10px 12px}
+.chat form .btn{flex:none;padding:10px 18px}

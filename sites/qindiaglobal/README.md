@@ -13,6 +13,7 @@ Qindiaglobal is a citizens' initiative for orderly queues and self-discipline at
 | `admin.html` | Owner page at qindiaglobal.com/admin: pledges, messages, download as CSV. Uses the server's owner password. |
 | `og.png`, `icon-512.png`, `favicon.svg`, `qr.svg` | Share preview picture, app icon, browser icon, QR code |
 | `blog/` | The Q India Blog at qindiaglobal.com/blog. Each post is one HTML file (English); add it to `blog/index.html` and `sitemap.xml`. Pictures in `blog/img` are our own drawings. |
+| `community.html`, `community.js`, `community.css` | **Q India Community** at qindiaglobal.com/community: free accounts (username + password + recovery code), posts with photos, feed, likes, comments, follow, alerts, private 1-to-1 messages, block and report. Server side: `server/qindia-social.js` (tables `s_*`; photos in `MEDIA_DIR`, default `/data/media`). Owner moderates in the Community section of /admin. |
 | `sitemap.xml`, `robots.txt` | For Google |
 
 The pledge counter, the contact form and the owner page are run by `server/qindia.js` in the Node app and saved in the
