@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qindiaglobal ads (owner)</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+@media (min-width:560px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;font-size:13px}
+.stat b{display:block;font-size:24px;color:var(--deep)}
+.item{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.item.off{opacity:.6}
+.item .meta{font-size:13px;color:var(--muted)}
+.item p{margin:6px 0;overflow-wrap:anywhere}
+.item img{max-width:100%;max-height:180px;border-radius:10px;display:block;margin:6px 0}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;background:var(--bg)}
+.badge.pending{background:#fff3cd;color:#7a5600}.badge.active{background:#dcf5e3;color:var(--ok)}.badge.rejected{background:#fde2e1;color:var(--bad)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.small-note{font-size:13px;color:var(--muted);margin:0 0 12px}
+.small-btn{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.pick{display:flex;flex-wrap:wrap;gap:8px}
+.pick label{display:flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--ink)}
+.pick input{width:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+.tbl td,.tbl th{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start}.tbl th{background:var(--bg);font-size:12px;color:var(--muted)}
+.steps li{margin:6px 0}
+details.card summary{font-weight:700;cursor:pointer;color:var(--deep)}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap bar-in"><a class="brand" href="/admin"><b>Q</b>india<span>global</span></a><a class="small-btn" href="/admin">← Owner page</a></div></header>
+<main class="wrap block">
+  <section id="need" class="card" hidden>
+    <h2>Please log in first</h2>
+    <p>Open the owner page, log in, then tap <b>Ads and earnings</b>.</p>
+    <p><a class="btn" href="/admin">Open owner page</a></p>
+  </section>
+  <section id="panel" hidden>
+    <h1 style="font-size:30px">Ads and earnings</h1>
+    <div class="stats">
+      <div class="stat"><b id="sRun">0</b>ads running now</div>
+      <div class="stat"><b id="sWait">0</b>ad requests waiting</div>
+      <div class="stat"><b id="sViews">0</b>ad views</div>
+      <div class="stat"><b id="sClicks">0</b>ad clicks</div>
+      <div class="stat"><b id="sCtr">0%</b>clicks per 100 views</div>
+      <div class="stat"><b id="sPaid">₹0</b>received from advertisers</div>
+      <div class="stat"><b id="s30v">0</b>views, last 30 days</div>
+      <div class="stat"><b id="s30c">0</b>clicks, last 30 days</div>
+    </div>
+    <p class="small-note">Advertisers ask for ads at <a href="/advertise" target="_blank">qindiaglobal.com/advertise</a>. Their requests wait here for you. Agree the price and take payment (UPI or bank) first, write the amount in <b>Money received</b>, then tap <b>Approve</b>. Google AdSense money is shown in your AdSense account, not here.</p>
+
+    <h2 id="formTop">Add an ad</h2>
+    <form id="adForm" class="card" style="margin-top:0">
+      <div class="row"><input name="advertiser" maxlength="80" placeholder="Advertiser / business name"><input name="contact" maxlength="120" placeholder="Their email or phone"></div>
+      <input name="title" maxlength="60" placeholder="Ad title (up to 60 letters)" required>
+      <input name="text" maxlength="140" placeholder="One short line (up to 140 letters)">
+      <input name="link" maxlength="500" placeholder="Link, e.g. https://example.com" required>
+      <label>Picture (optional) <input type="file" name="image" accept="image/*"></label>
+      <div id="imgNow"></div>
+      <label>Show on</label>
+      <div class="pick" id="slotPick"></div>
+      <div class="row"><label>From date (empty = now) <input type="date" name="starts"></label><label>To date (empty = no end) <input type="date" name="ends"></label></div>
+      <div class="row">
+        <label>Agreed price (your note) <input name="price" maxlength="80" placeholder="e.g. ₹2,000 per month"></label>
+        <label>Money received (₹) <input name="paid" type="number" min="0" step="1" placeholder="0"></label>
+      </div>
+      <label>Share of showings (1 = normal, 10 = shown 10 times more often than a "1" ad) <input name="weight" type="number" min="1" max="10" value="1"></label>
+      <textarea name="note" rows="2" maxlength="1000" placeholder="Private note (only you see it)"></textarea>
+      <div class="tools"><button class="btn" id="adSave">Save and show the ad</button><button type="button" class="small-btn" id="adCancel" hidden>Cancel editing</button></div>
+      <p class="msg" id="adMsg"></p>
+    </form>
+
+    <h2>All ads</h2>
+    <div id="ads"></div>
+
+    <h2 style="margin-top:24px">Last 30 days</h2>
+    <div style="overflow-x:auto"><table class="tbl" id="days"></table></div>
+
+    <h2 style="margin-top:24px">Settings</h2>
+    <form id="setForm" class="card" style="margin-top:0">
+      <label class="consent"><input type="checkbox" name="enabled"> <span>Show ads on the website (untick to switch every ad off at once)</span></label>
+      <label>Prices shown on the Advertise page (optional)
+        <textarea name="rates" rows="4" maxlength="2000" placeholder="e.g.&#10;Home page: ₹1,500 per week&#10;All pages: ₹5,000 per month"></textarea></label>
+      <h3 style="margin:10px 0 0;color:var(--deep)">Google AdSense (optional)</h3>
+      <label>Publisher ID <input name="adsenseClient" placeholder="pub-1234567890123456" autocomplete="off"></label>
+      <label>Ad unit ID for the ad boxes (optional) <input name="adsenseSlot" placeholder="1234567890" autocomplete="off"></label>
+      <label>How Google ads are used
+        <select name="adsenseMode">
+          <option value="off">Off: only my own ads</option>
+          <option value="fill">Fill empty ad boxes with Google ads (needs the ad unit ID)</option>
+          <option value="auto">Fill empty boxes, and let Google place more ads (Auto ads)</option>
+        </select></label>
+      <button class="btn">Save settings</button>
+      <p class="msg" id="setMsg"></p>
+    </form>
+
+    <details class="card">
+      <summary>How to get Google AdSense (step by step)</summary>
+      <ol class="steps">
+        <li>On your phone, open <b>adsense.google.com</b> and sign in with your Gmail.</li>
+        <li>Tap <b>Get started</b>. Website: <b>qindiaglobal.com</b>. Choose India, accept the terms.</li>
+        <li>AdSense shows your <b>Publisher ID</b> (looks like pub-1234567890123456). Copy it, paste it above in <b>Publisher ID</b>, choose <b>Let Google place more ads</b>, and tap <b>Save settings</b>.</li>
+        <li>Back in AdSense, on "Connect your site", choose the <b>ads.txt snippet</b> method. Our website already serves the file at qindiaglobal.com/ads.txt once you saved the ID. Tap <b>Verify</b>, then <b>Request review</b>.</li>
+        <li>Google checks the site. This usually takes from a few days up to 2–4 weeks. Keep writing blog posts; sites with more original content are approved more easily.</li>
+        <li>After approval, in AdSense go to <b>Ads → By ad unit → Display ads</b>, name it "Qindia box", tap <b>Create</b>. Copy the number after <b>data-ad-slot=</b> and paste it above in <b>Ad unit ID</b>. Save.</li>
+        <li>In AdSense, go to <b>Privacy &amp; messaging</b> and turn on the <b>European regulations</b> message (free). Google needs this for visitors from Europe.</li>
+        <li>Add your bank details and PAN under <b>Payments</b>. Google pays when your balance reaches ₹8,000 (around the 21st of the month).</li>
+      </ol>
+      <p class="small-note">Never click your own Google ads or ask people to click them. Google closes accounts for that.</p>
+    </details>
+  </section>
+</main>
+<script src="/ads-form.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let tok = ""; try { tok = sessionStorage.getItem("qi_owner") || ""; } catch {}
+const SLOT_NAMES = { home: "Home page", blog: "Blog list", post: "Blog posts", feed: "Community feed" };
+const ST = { pending: "Waiting for you", active: "Running", paused: "Paused", rejected: "Refused" };
+const nf = n => Number(n || 0).toLocaleString("en-IN");
+const when = ms => new Date(ms).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "content-type": "application/json", authorization: "Bearer " + tok } });
+  if (res.status === 401) { $("panel").hidden = true; $("need").hidden = false; throw new Error("login"); }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || (res.status === 413 ? "The picture is too big." : "Server not reachable"));
+  return res;
+}
+const ctr = (v, c) => (v ? (Math.round(c / v * 1000) / 10) : 0) + "%";
+let data = null, editing = null, image = "";
+async function load() {
+  data = await (await api("/api/admin/ads")).json();
+  $("need").hidden = true; $("panel").hidden = false;
+  const live = a => a.status === "active" && (!a.starts || a.starts <= data.today) && (!a.ends || a.ends >= data.today);
+  $("sRun").textContent = data.ads.filter(live).length;
+  $("sWait").textContent = data.ads.filter(a => a.status === "pending").length;
+  $("sViews").textContent = nf(data.totals.views); $("sClicks").textContent = nf(data.totals.clicks);
+  $("sCtr").textContent = ctr(data.totals.views, data.totals.clicks); $("sPaid").textContent = "₹" + nf(data.totals.paid);
+  $("s30v").textContent = nf(data.days.reduce((s, d) => s + d.views, 0)); $("s30c").textContent = nf(data.days.reduce((s, d) => s + d.clicks, 0));
+  if (!$("slotPick").children.length) data.slots.forEach(s => { const l = el("label"); const i = el("input"); i.type = "checkbox"; i.name = "slots"; i.value = s; i.checked = true; l.append(i, " " + (SLOT_NAMES[s] || s)); $("slotPick").append(l); });
+  const box = $("ads"); box.replaceChildren();
+  if (!data.ads.length) box.append(el("p", null, "No ads yet. Add your first one above, or share qindiaglobal.com/advertise with businesses."));
+  data.ads.forEach(a => {
+    const it = el("div", "item" + (a.status === "rejected" || a.status === "paused" ? " off" : ""));
+    const top = el("div", "meta"); const b = el("span", "badge " + a.status, ST[a.status] || a.status);
+    let extra = a.status === "active" && !live(a) ? (a.ends && a.ends < data.today ? " (dates over)" : " (starts " + a.starts + ")") : "";
+    top.append(b, " " + extra + " · " + (a.source === "advertiser" ? "From advertiser" : "Added by you") + " · " + when(a.created_at));
+    it.append(top);
+    if (a.image_type) { const img = el("img"); img.alt = ""; it.append(img); api("/api/admin/ads/" + a.id + "/img").then(r => r.blob()).then(bl => { img.src = URL.createObjectURL(bl); }).catch(() => {}); }
+    it.append(el("p", null, a.title)); if (a.text) it.append(el("div", "meta", a.text));
+    const lk = el("a", null, a.link); lk.href = a.link; lk.target = "_blank"; lk.rel = "noopener nofollow"; const lp = el("p"); lp.append(lk); it.append(lp);
+    it.append(el("div", "meta", [a.advertiser, a.contact].filter(Boolean).join(" · ")));
+    it.append(el("div", "meta", "Shows on: " + a.slots.split(",").map(s => SLOT_NAMES[s] || s).join(", ") + " · Dates: " + (a.starts || "now") + " to " + (a.ends || "no end")));
+    it.append(el("div", "meta", nf(a.views) + " views · " + nf(a.clicks) + " clicks · " + ctr(a.views, a.clicks) + (a.price ? " · Price: " + a.price : "") + " · Received ₹" + nf(a.paid)));
+    if (a.note) it.append(el("p", "meta", "Note: " + a.note));
+    const tools = el("div", "tools");
+    const acts = { pending: [["approve", "Approve"], ["reject", "Refuse"]], active: [["pause", "Pause"]], paused: [["resume", "Show again"]], rejected: [["approve", "Approve"]] }[a.status] || [];
+    acts.forEach(([act, label]) => { const bt = el("button", "small-btn", label); bt.onclick = async () => { await api("/api/admin/ads/" + a.id, { method: "POST", body: JSON.stringify({ action: act }) }); load(); }; tools.append(bt); });
+    const ed = el("button", "small-btn", "Edit"); ed.onclick = () => edit(a); tools.append(ed);
+    const del = el("button", "small-btn", "Delete");
+    del.onclick = async () => { if (del.dataset.sure) { await api("/api/admin/ads/" + a.id, { method: "POST", body: JSON.stringify({ action: "delete" }) }); if (editing === a.id) editDone(); load(); } else { del.dataset.sure = "1"; del.textContent = "Tap again to delete"; } };
+    tools.append(del); it.append(tools); box.append(it);
+  });
+  const t = $("days"); t.replaceChildren();
+  const h = el("tr"); ["Day", "Views", "Clicks", "Clicks per 100"].forEach(x => h.append(el("th", null, x))); t.append(h);
+  data.days.forEach(d => { const tr = el("tr"); [d.day, nf(d.views), nf(d.clicks), ctr(d.views, d.clicks)].forEach(x => tr.append(el("td", null, x))); t.append(tr); });
+  if (!data.days.length) { const tr = el("tr"); const td = el("td", null, "No views yet."); td.colSpan = 4; tr.append(td); t.append(tr); }
+  const s = data.settings, sf = $("setForm");
+  sf.enabled.checked = s.enabled; sf.rates.value = s.rates; sf.adsenseClient.value = s.adsenseClient; sf.adsenseSlot.value = s.adsenseSlot; sf.adsenseMode.value = s.adsenseMode;
+}
+function edit(a) {
+  editing = a.id; image = ""; const f = $("adForm");
+  ["advertiser", "contact", "title", "text", "link", "starts", "ends", "price", "note"].forEach(k => { f.elements[k].value = a[k] || ""; });
+  f.paid.value = a.paid || ""; f.weight.value = a.weight || 1;
+  const on = a.slots.split(","); f.querySelectorAll("[name=slots]").forEach(i => { i.checked = on.includes(i.value); });
+  $("imgNow").replaceChildren(); if (a.image_type) { const bt = el("button", "small-btn", "Remove the picture"); bt.type = "button"; bt.onclick = () => { image = "remove"; $("imgNow").replaceChildren(el("p", "small-note", "The picture will be removed when you save.")); }; $("imgNow").append(bt); }
+  $("adSave").textContent = "Save changes"; $("adCancel").hidden = false; $("formTop").textContent = "Edit the ad"; $("formTop").scrollIntoView();
+}
+function editDone() { editing = null; image = ""; $("adForm").reset(); $("imgNow").replaceChildren(); $("adSave").textContent = "Save and show the ad"; $("adCancel").hidden = true; $("formTop").textContent = "Add an ad"; }
+$("adCancel").onclick = editDone;
+$("adForm").image.onchange = async () => {
+  const f = $("adForm"); $("imgNow").replaceChildren();
+  try { image = await QI_ADS.shrink(f.image.files[0]); if (image) { const i = el("img"); i.src = image; i.style.maxWidth = "100%"; $("imgNow").append(i); } }
+  catch (e) { $("adMsg").className = "msg bad"; $("adMsg").textContent = e.message; f.image.value = ""; }
+};
+$("adForm").onsubmit = async e => {
+  e.preventDefault(); const f = e.target, msg = $("adMsg"); msg.className = "msg"; msg.textContent = "Saving…";
+  let link = f.link.value.trim(); if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+  const body = { advertiser: f.advertiser.value, contact: f.contact.value, title: f.title.value, text: f.text.value, link, starts: f.starts.value, ends: f.ends.value,
+    price: f.price.value, paid: f.paid.value, weight: f.weight.value, note: f.note.value, slots: [...f.querySelectorAll("[name=slots]:checked")].map(i => i.value), image };
+  if (editing) body.action = "save";
+  try { await api("/api/admin/ads" + (editing ? "/" + editing : ""), { method: "POST", body: JSON.stringify(body) }); msg.className = "msg ok"; msg.textContent = "Saved."; editDone(); load(); }
+  catch (err) { msg.className = "msg bad"; msg.textContent = err.message; }
+};
+$("setForm").onsubmit = async e => {
+  e.preventDefault(); const f = e.target, msg = $("setMsg");
+  try {
+    await api("/api/admin/ads-settings", { method: "POST", body: JSON.stringify({ enabled: f.enabled.checked, rates: f.rates.value, adsenseClient: f.adsenseClient.value, adsenseSlot: f.adsenseSlot.value, adsenseMode: f.adsenseMode.value }) });
+    msg.className = "msg ok"; msg.textContent = "Saved."; load();
+  } catch (err) { msg.className = "msg bad"; msg.textContent = err.message; }
+};
+if (tok) load().catch(() => {}); else $("need").hidden = false;
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advertise on Qindiaglobal</title>
+<meta name="description" content="Put your business in front of people who care about orderly, safe public transport. Ads on qindiaglobal.com support a citizens' queue initiative.">
+<meta name="theme-color" content="#1d3557">
+<link rel="canonical" href="https://qindiaglobal.com/advertise">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.tnote{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
+.places-pick{display:flex;flex-wrap:wrap;gap:8px}
+.places-pick label{display:flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-weight:600;color:var(--ink)}
+.places-pick input{width:auto}
+.rates{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.rules li{margin:4px 0;font-size:15px}
+#preview img{max-width:100%;border-radius:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="Qindiaglobal home"><b>Q</b>india<span>global</span></a>
+    <select id="lang" aria-label="Language"></select>
+  </div>
+  <nav class="wrap nav"><a href="/">Home</a><a href="/blog/">Blog</a><a href="/#pledge">Pledge</a></nav>
+</header>
+<main class="wrap block">
+  <p class="tnote"><b data-t="discH"></b> <span data-t="disc"></span></p>
+  <h1 style="font-size:clamp(28px,6vw,38px)">Advertise on Qindiaglobal</h1>
+  <p>Reach people across India and the world who care about safe, orderly public transport. Your ad money helps this citizens' initiative print posters, run awareness drives and keep the website free for everyone.</p>
+  <h2>Where your ad shows</h2>
+  <p>On the home page, the blog, inside blog posts and in the community feed. Every ad is clearly marked <b>Ad</b>. You get a picture, a title, one short line and a link to your website or shop.</p>
+  <div id="ratesBox" hidden><h2>Prices</h2><div class="rates" id="rates"></div></div>
+  <h2>Ad rules</h2>
+  <ul class="rules">
+    <li>No political, religious, adult, gambling, betting, alcohol, tobacco or drug ads.</li>
+    <li>No misleading claims, fake offers, loans with hidden costs, or "get rich" schemes.</li>
+    <li>Your ad must not look like a government notice or suggest that any government body supports you.</li>
+    <li>We check every ad before it goes live and may refuse any ad without giving a reason.</li>
+  </ul>
+  <section class="card">
+    <h2>Ask for an ad</h2>
+    <p class="small-note" style="font-size:14px;color:var(--muted)">Nothing is charged now. We look at your ad, then contact you about the price, dates and payment. Your ad goes live after payment and approval.</p>
+    <form id="advForm" novalidate>
+      <div class="row">
+        <input name="advertiser" maxlength="80" placeholder="Business name" required>
+        <input name="contact" maxlength="120" placeholder="Your email or phone" required>
+      </div>
+      <input name="title" maxlength="60" placeholder="Ad title (up to 60 letters)" required>
+      <input name="text" maxlength="140" placeholder="One short line about your offer (up to 140 letters)">
+      <input name="link" type="url" maxlength="500" placeholder="Your website link, e.g. https://example.com" required>
+      <label>Picture (optional, wide pictures look best)
+        <input type="file" name="image" accept="image/*">
+      </label>
+      <div id="preview"></div>
+      <label>Where should it show?</label>
+      <div class="places-pick">
+        <label><input type="checkbox" name="slots" value="home" checked> Home page</label>
+        <label><input type="checkbox" name="slots" value="blog" checked> Blog</label>
+        <label><input type="checkbox" name="slots" value="post" checked> Blog posts</label>
+        <label><input type="checkbox" name="slots" value="feed" checked> Community feed</label>
+      </div>
+      <div class="row">
+        <label>From date <input type="date" name="starts"></label>
+        <label>To date <input type="date" name="ends"></label>
+      </div>
+      <textarea name="note" rows="3" maxlength="1000" placeholder="Anything else? (budget, city you want to reach…)"></textarea>
+      <label class="consent"><input type="checkbox" name="agree"> <span>My ad follows the ad rules above, and I agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Use</a>.</span></label>
+      <input name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Send my ad request</button>
+      <p class="msg" id="advMsg" role="status"></p>
+    </form>
+  </section>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
+    <p><a class="flink" href="/blog/">Blog</a> · <a class="flink" href="/terms.html" data-t="terms_link"></a> · <a class="flink" href="/terms.html#privacy" data-t="privacy_link"></a></p>
+    <p class="small"><span data-t="tagline"></span> · qindiaglobal.com</p>
+  </div>
+</footer>
+<script src="/i18n.js"></script>
+<script src="/i18n-in1.js"></script>
+<script src="/i18n-in2.js"></script>
+<script src="/ads-form.js"></script>
+<script>
+(function () {
+  const sel = document.getElementById("lang"); QI_fillSelect(sel);
+  const main = document.querySelector("main");
+  const go = l => { sel.value = l; QI_apply(l); document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; main.dir = "ltr"; };
+  sel.onchange = () => go(sel.value); go(QI_pick());
+  QI_ADS.start();
+  fetch("/api/ads/rates").then(r => r.json()).then(d => { if (d.rates) { document.getElementById("rates").textContent = d.rates; document.getElementById("ratesBox").hidden = false; } }).catch(() => {});
+  const f = document.getElementById("advForm"), msg = document.getElementById("advMsg");
+  let image = "";
+  f.image.onchange = async () => {
+    const box = document.getElementById("preview"); box.replaceChildren(); image = "";
+    try { image = await QI_ADS.shrink(f.image.files[0]); if (image) { const i = new Image(); i.src = image; i.alt = ""; box.append(i); } }
+    catch (e) { msg.className = "msg bad"; msg.textContent = e.message; f.image.value = ""; }
+  };
+  f.onsubmit = async e => {
+    e.preventDefault(); msg.className = "msg"; msg.textContent = "Sending…";
+    const body = {
+      advertiser: f.advertiser.value, contact: f.contact.value, title: f.title.value, text: f.text.value, link: f.link.value.trim(),
+      slots: [...f.querySelectorAll("[name=slots]:checked")].map(x => x.value), starts: f.starts.value, ends: f.ends.value,
+      note: f.note.value, agree: f.agree.checked, website: f.website.value, image,
+    };
+    if (body.link && !/^https?:\/\//i.test(body.link)) body.link = "https://" + body.link;
+    Object.assign(body, await QI_ADS.prove());
+    const res = await fetch("/api/advertise", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const d = res && await res.json().catch(() => null);
+    if (res && res.ok) { f.reset(); image = ""; document.getElementById("preview").replaceChildren(); msg.className = "msg ok"; msg.textContent = "Thank you! We will check your ad and contact you soon."; return; }
+    msg.className = "msg bad"; msg.textContent = (d && d.error) || (res && res.status === 413 ? "The picture is too big." : "The server is not reachable. Please try again.");
+  };
+})();
+</script>
+</body>
+</html>

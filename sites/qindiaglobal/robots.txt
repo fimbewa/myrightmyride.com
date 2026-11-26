@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /ads/go/
 Sitemap: https://qindiaglobal.com/sitemap.xml
