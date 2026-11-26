@@ -30,4 +30,8 @@
 .pcard-link div{padding:14px 16px}.pcard-link h2{margin:0 0 6px;font-size:20px}.pcard-link p{margin:0;color:var(--muted)}
 .pcard-link span{display:inline-block;margin-top:8px;color:var(--accent);font-weight:700}
 /* Posts the owner writes on the owner page: plain text, so keep long words and links inside the screen. */
-.post-body{overflow-wrap:anywhere}.post-body p{white-space:normal}.post-body a{overflow-wrap:anywhere}
+.post-body{overflow-wrap:break-word;font-size:17px;line-height:1.7}
+.post-body p,.post-body li{white-space:normal;text-align:justify;text-justify:inter-word}
+.post-body ul{padding-inline-start:22px}.post-body li{margin:8px 0}
+.post-body h2{margin:34px 0 10px;line-height:1.3}.post-body h3{margin:24px 0 8px}
+.post-body a{overflow-wrap:anywhere;font-weight:600}

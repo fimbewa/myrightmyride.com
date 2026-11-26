@@ -183,7 +183,7 @@ test("owner can publish blog posts up to 250,000 characters", async () => {
   assert.equal((await call("POST", "/api/admin/posts", { title: "x", body: "y" })).status, 401);
   const { token } = (await call("POST", "/api/admin/login", { password: "brandnew123" })).data;
   // 250,000 characters in Devanagari is about 750 KB, near the old 1 MB body limit, so test that too.
-  const head = "# Queue first\n\nलाइन में खड़े रहें। ", tail = "\n\n- one https://example.com/a?b=1&c=2\n- two <script>alert(1)</script>";
+  const head = "# Queue first\n\nलाइन में खड़े रहें। ", tail = "\n\n- one https://example.com/a?b=1&c=2\n- two <script>alert(1)</script>\n- [Read the news](https://example.org/news-1), and https://example.org/x.";
   const long = head + "क".repeat(250000 - [...head].length - [...tail].length) + tail;
   assert.equal([...long].length, 250000);
   const ok = await call("POST", "/api/admin/posts", { title: "Queue first, always", body: long }, { token });
@@ -194,6 +194,7 @@ test("owner can publish blog posts up to 250,000 characters", async () => {
   assert.match(page.text, /<h1>Queue first, always<\/h1>/);
   assert.match(page.text, /<h2>Queue first<\/h2>/);
   assert.match(page.text, /<li>one <a href="https:\/\/example.com\/a\?b=1&amp;c=2"/);
+  assert.match(page.text, /<li><a href="https:\/\/example.org\/news-1" target="_blank" rel="noopener nofollow ugc">Read the news<\/a>, and <a href="https:\/\/example.org\/x"/);
   assert.doesNotMatch(page.text, /<script>alert/);
   assert.match(page.text, /data-t="disc"/);
   assert.match((await call("GET", "/blog/")).text, /href="\/blog\/queue-first-always"/);
