@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referral rewards · Qindiaglobal</title>
+<meta name="description" content="Invite people to Q India Community. Members who bring 1,000 sign-ups share in the website's ad income. No ad income means no payment.">
+<meta name="theme-color" content="#1d3557">
+<link rel="canonical" href="https://qindiaglobal.com/referral">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.tnote{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--muted)}
+.clear{background:#fff3cd;border-radius:16px;padding:14px 16px;margin:16px 0}
+.clear h2{color:#7a5600;font-size:20px}.clear li{margin:6px 0}
+.bar-out{height:18px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
+.bar-in2{height:100%;background:var(--accent);width:0}
+.big{font-size:34px;font-weight:800;color:var(--deep)}
+.code{font-family:monospace;background:var(--bg);border-radius:10px;padding:10px;overflow-wrap:anywhere}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+.tbl td,.tbl th{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start}.tbl th{background:var(--bg);font-size:12px;color:var(--muted)}
+.ex{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="Qindiaglobal home"><b>Q</b>india<span>global</span></a>
+    <select id="lang" aria-label="Language"></select>
+  </div>
+  <nav class="wrap nav"><a href="/">Home</a><a href="/community">Community</a><a href="/careers">Careers</a><a href="/blog/">Blog</a></nav>
+</header>
+<main class="wrap block">
+  <p class="tnote"><b data-t="discH"></b> <span data-t="disc"></span></p>
+  <h1 style="font-size:clamp(28px,6vw,38px)">Referral rewards</h1>
+  <p>Invite people to join Q India Community with your own link. Help the movement grow, and once you bring <b id="tTarget">1,000</b> real members, share in the website's ad income.</p>
+
+  <section class="clear">
+    <h2>Please read this first</h2>
+    <ul>
+      <li><b>Below <span class="tgt">1,000</span> sign-ups there is no reward at all.</b> Only real, active accounts that joined through your link count.</li>
+      <li>After that, each month <b><span id="tShare">10</span>% of the ad income Qindiaglobal actually receives</b> is shared between everyone who has reached <span class="tgt">1,000</span>, in proportion to their sign-ups.</li>
+      <li><b>If there is no ad income in a month, there is no payment for that month.</b> There is no guaranteed income, no fixed or minimum amount, and nothing is made up later.</li>
+      <li>This is a thank-you, not a job or salary. It is free to take part; Qindiaglobal never asks you for money.</li>
+      <li>Never pay people to join, never spam, and never make fake accounts. Fake sign-ups are removed and can cancel your rewards.</li>
+    </ul>
+    <p class="ex"><b>Example:</b> in a month the site receives ₹50,000 from ads. 10% = ₹5,000 is the reward pool. Two members qualify: one with 3,000 sign-ups and one with 2,000. They get ₹3,000 and ₹2,000. If that month's ad income were ₹0, both would get ₹0.</p>
+    <p>Full rules: <a href="/legal/referral">Referral Program Terms</a>.</p>
+  </section>
+
+  <section id="out" class="card" hidden>
+    <h2>Join the community to get your link</h2>
+    <p>Create a free Q India Community account or log in. Your invite link and progress will show here.</p>
+    <p><a class="btn" href="/community#/signup">Create free account</a> <a class="btn ghost" href="/community#/login">Log in</a></p>
+  </section>
+
+  <section id="in" hidden>
+    <div class="card">
+      <h2>Your invite link</h2>
+      <p class="code" id="link"></p>
+      <p><button class="btn" id="share">Share my link</button></p>
+    </div>
+    <div class="card">
+      <h2>Your progress</h2>
+      <p><span class="big" id="count">0</span> of <span class="tgt">1,000</span> qualifying sign-ups</p>
+      <div class="bar-out"><div class="bar-in2" id="bar"></div></div>
+      <p id="status"></p>
+    </div>
+    <div class="card">
+      <h2>Payment details</h2>
+      <p class="ex">Needed only when you reach <span class="tgt">1,000</span>. Rewards go only to an account in your own name. Your PAN is needed for tax (TDS) and is seen only by the owner.</p>
+      <p id="payeeNow" class="ex"></p>
+      <form id="payee">
+        <input name="legal_name" maxlength="100" placeholder="Full name as on PAN card" required>
+        <input name="pan" maxlength="10" placeholder="PAN, e.g. ABCDE1234F" autocapitalize="characters" required>
+        <input name="upi" maxlength="300" placeholder="UPI ID, e.g. name@okbank">
+        <div class="row"><input name="bank_account" maxlength="18" inputmode="numeric" placeholder="or bank account number"><input name="ifsc" maxlength="11" placeholder="IFSC code" autocapitalize="characters"></div>
+        <button class="btn">Save payment details</button>
+        <p class="msg" id="payeeMsg"></p>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Your rewards</h2>
+      <div id="payouts"></div>
+    </div>
+  </section>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
+    <p><a class="flink" href="/legal/referral">Referral Program Terms</a> · <a class="flink" href="/legal/terms" data-t="terms_link"></a> · <a class="flink" href="/legal/privacy" data-t="privacy_link"></a></p>
+    <p class="small"><span data-t="tagline"></span> · qindiaglobal.com</p>
+  </div>
+</footer>
+<script src="/i18n.js"></script>
+<script src="/i18n-in1.js"></script>
+<script src="/i18n-in2.js"></script>
+<script>
+(function () {
+  const sel = document.getElementById("lang"); QI_fillSelect(sel);
+  const main = document.querySelector("main");
+  const go = l => { sel.value = l; QI_apply(l); document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; main.dir = "ltr"; };
+  sel.onchange = () => go(sel.value); go(QI_pick());
+  const $ = id => document.getElementById(id), nf = n => Number(n || 0).toLocaleString("en-IN");
+  let tok = ""; try { tok = localStorage.getItem("qi_s_token") || ""; } catch {}
+  const api = (p, body) => fetch(p, { method: body ? "POST" : "GET", headers: { "content-type": "application/json", authorization: "Bearer " + tok }, body: body ? JSON.stringify(body) : undefined })
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.error || "Server not reachable"), { status: r.status }); return d; });
+  function load() {
+    api("/api/referral/rules").then(d => { document.querySelectorAll(".tgt").forEach(e => { e.textContent = nf(d.target); }); $("tTarget").textContent = nf(d.target); $("tShare").textContent = d.share; }).catch(() => {});
+    if (!tok) { $("out").hidden = false; return; }
+    api("/api/referral/me").then(d => {
+      $("in").hidden = false;
+      document.querySelectorAll(".tgt").forEach(e => { e.textContent = nf(d.target); }); $("tTarget").textContent = nf(d.target); $("tShare").textContent = d.share;
+      $("link").textContent = d.link;
+      $("share").onclick = () => navigator.share ? navigator.share({ title: "Join me on Q India Community", url: d.link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent("Join me on Q India Community: " + d.link), "_blank", "noopener");
+      $("count").textContent = nf(d.signups);
+      $("bar").style.width = Math.min(100, d.signups / d.target * 100) + "%";
+      $("status").textContent = !d.on ? "The referral program is paused at the moment."
+        : d.signups >= d.target ? "You have qualified. You will get a share in every month that Qindiaglobal receives ad income. No ad income means no payment for that month."
+        : nf(d.target - d.signups) + " more to go. Until then there is no reward.";
+      $("payeeNow").textContent = d.payee ? "Saved: " + d.payee.legal_name + " · PAN " + d.payee.pan + (d.payee.upi ? " · UPI " + d.payee.upi : "") + (d.payee.bank_account ? " · Bank " + d.payee.bank_account + " " + d.payee.ifsc : "") + ". You can change them below." : "";
+      const box = $("payouts"); box.replaceChildren();
+      if (!d.payouts.length) { const p = document.createElement("p"); p.className = "ex"; p.textContent = "No rewards yet."; box.append(p); return; }
+      const t = document.createElement("table"); t.className = "tbl";
+      t.innerHTML = "<tr><th>Month</th><th>Your sign-ups</th><th>Reward</th><th>Status</th></tr>";
+      d.payouts.forEach(x => { const tr = t.insertRow(); [x.month, nf(x.signups), "₹" + nf(x.amount), x.status === "paid" ? "Paid" : "To be paid"].forEach(v => { tr.insertCell().textContent = v; }); });
+      box.append(t);
+    }).catch(e => { if (e.status === 401) { try { localStorage.removeItem("qi_s_token"); } catch {} tok = ""; $("out").hidden = false; } });
+  }
+  $("payee").onsubmit = async e => {
+    e.preventDefault(); const f = e.target, msg = $("payeeMsg"); msg.className = "msg";
+    try { await api("/api/referral/payee", { legal_name: f.legal_name.value, pan: f.pan.value, upi: f.upi.value, bank_account: f.bank_account.value, ifsc: f.ifsc.value }); f.reset(); msg.className = "msg ok"; msg.textContent = "Saved."; load(); }
+    catch (err) { msg.className = "msg bad"; msg.textContent = err.message; }
+  };
+  load();
+})();
+</script>
+</body>
+</html>
