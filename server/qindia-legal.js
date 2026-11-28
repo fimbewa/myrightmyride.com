@@ -26,7 +26,7 @@ function legalHold(db, mediaDir) {
   if (HOLD) fs.mkdirSync(HOLD, { recursive: true });
   function keep(kind, refId, data, { photo = null, reason = null } = {}) {
     let kept = null;
-    if (photo && HOLD && /^[a-f0-9]{32}\.jpg$/.test(photo)) {
+    if (photo && HOLD && /^[a-f0-9]{32}\.(jpg|mp4|webm|m4a|weba|ogg)$/.test(photo)) {
       try { fs.renameSync(path.join(mediaDir, photo), path.join(HOLD, photo)); kept = photo; } catch {}
     }
     const t = Date.now();

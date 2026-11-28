@@ -138,3 +138,27 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .list div.li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:14px;margin:8px 0}
 .cm h2{font-size:18px;margin:16px 0 6px;color:var(--deep)}
 .code{overflow-wrap:anywhere}
+/* Short videos and Reels */
+.cm-find{margin-inline-start:auto;margin-inline-end:12px;text-decoration:none;font-size:20px}
+.post video.vid{display:block;width:100%;max-height:80vh;background:#000}
+.reels{height:calc(100dvh - 190px);min-height:360px;overflow-y:auto;scroll-snap-type:y mandatory;border-radius:16px;background:#000}
+.reel{position:relative;height:100%;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.reel video{width:100%;height:100%;object-fit:contain;background:#000}
+.reel .snd{position:absolute;top:10px;right:10px;font-size:18px;background:rgba(0,0,0,.45);border-radius:999px;padding:4px 8px;pointer-events:none}
+.reel .side{position:absolute;right:8px;bottom:90px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.reel .side button,.reel .side a{font:inherit;font-size:26px;color:#fff;background:none;border:0;cursor:pointer;text-decoration:none;display:flex;flex-direction:column;align-items:center;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.reel .side small{font-size:12px;font-weight:700}
+.reel .side .on{color:#ff4d6d}
+.reel .side .dots{color:#fff;font-size:26px}
+.reel .side .more-menu{right:100%;top:auto;bottom:0}
+.reel .side .more-menu button{color:var(--ink);font-size:14px;text-shadow:none;display:block}
+.reel .cap{position:absolute;left:0;right:56px;bottom:0;padding:12px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+.reel .cap .who,.reel .cap b{color:#fff}
+.reel .cap p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;max-height:5.5em;overflow:hidden}
+.reel .cap a{color:#fff}
+/* Voice messages */
+.voice{display:inline-flex;align-items:center;gap:6px;flex:none}
+.chat form .voice .sbtn{padding:10px 12px}
+.voice .rec{color:var(--bad);font-variant-numeric:tabular-nums;min-width:52px}
+.voice:has(.rec) ~ textarea{display:none}
+.bubble audio{display:block;width:240px;max-width:100%;height:40px;margin-bottom:2px}

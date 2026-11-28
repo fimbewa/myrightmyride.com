@@ -235,7 +235,12 @@ function cItem(meta, who, text, photo, buttons) {
   it.append(el("div", "meta", meta));
   if (who) { const a = el("a", null, "@" + who); a.href = "/community#/u/" + who; a.target = "_blank"; it.append(a); }
   if (text) it.append(el("p", null, text));
-  if (photo) { const img = el("img"); img.src = photo; img.alt = ""; img.style.cssText = "max-width:100%;max-height:320px;border-radius:10px;display:block;margin:6px 0"; it.append(img); }
+  if (photo) {
+    // photo, short video or voice message (the file ending tells which)
+    const kind = /\.(mp4|webm)$/.test(photo) ? "video" : /\.(m4a|weba|ogg)$/.test(photo) ? "audio" : "img";
+    const m = el(kind); m.src = photo; if (kind === "img") m.alt = ""; else { m.controls = true; m.preload = "metadata"; }
+    m.style.cssText = "max-width:100%;max-height:320px;border-radius:10px;display:block;margin:6px 0"; it.append(m);
+  }
   const tools = el("div", "tools");
   buttons.forEach(([label, body, sure]) => {
     const b = el("button", "small-btn", label);

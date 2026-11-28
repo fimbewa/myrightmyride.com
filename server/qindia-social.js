@@ -11,6 +11,14 @@ const { isBad, isDoubtful } = require("./qindia-safety");
 const PAGE = 20;
 const PHOTO_MAX = 3 * 1024 * 1024;        // 3 MB per photo after the phone shrinks it (usually 200-500 KB)
 const MIN_FREE_DISK = 2 * 1024 ** 3;       // stop taking photos when less than 2 GB is free on the server
+const VIDEO_MAX = 40 * 1024 * 1024;       // 40 MB per short video (about 1 minute at 720p); the phone checks the length
+const AUDIO_MAX = 3 * 1024 * 1024;        // 3 MB per voice message (2 minutes is about 1 MB)
+// Media files: <32 hex>.<ext>. The extension tells the kind: jpg = photo, mp4/webm = video, m4a/weba/ogg = voice.
+const MEDIA_RX = /^[a-f0-9]{32}\.(jpg|mp4|webm|m4a|weba|ogg)$/;
+const KIND_OF = { jpg: "photo", mp4: "video", webm: "video", m4a: "audio", weba: "audio", ogg: "audio" };
+const mediaKind = name => (name ? KIND_OF[String(name).split(".").pop()] || null : null);
+// { photo } or { video } or { audio } with the address, for one stored media name.
+const mediaOut = name => { const k = mediaKind(name); return k ? { [k]: "/media/" + name } : {}; };
 const TEXT_MAX = 5000, COMMENT_MAX = 1000, MESSAGE_MAX = 2000, BIO_MAX = 300;
 const USERNAME_RX = /^[a-z0-9_.]{3,20}$/;
 const RESERVED = new Set(["admin", "owner", "qindia", "qindiaglobal", "support", "help", "official", "moderator", "root", "system", "api", "media", "me", "login", "signup", "community", "blog", "terms", "privacy", "everyone", "null", "undefined"]);
@@ -271,8 +279,29 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     db.prepare("INSERT INTO s_media(name, user_id, bytes, created_at) VALUES(?,?,?,?)").run(name, me.id, jpg.length, now());
     res.json({ id: name });
   });
-  function takeMedia(name, userId) {
-    if (!/^[a-f0-9]{32}\.jpg$/.test(String(name))) return null;
+  // Short videos and voice messages: kept as the phone recorded them (MP4, WebM, M4A or Ogg); only the file type is checked.
+  function sniff(buf, kind) {
+    if (!Buffer.isBuffer(buf) || buf.length < 16) return null;
+    const ftyp = buf.toString("latin1", 4, 8) === "ftyp", webm = buf.readUInt32BE(0) === 0x1a45dfa3, ogg = buf.toString("latin1", 0, 4) === "OggS";
+    if (kind === "video") return ftyp ? "mp4" : webm ? "webm" : null;
+    if (kind === "audio") return ftyp ? "m4a" : webm ? "weba" : ogg ? "ogg" : null;
+    return null;
+  }
+  r.post("/api/s/upload-av", login, express.raw({ type: () => true, limit: VIDEO_MAX }), (req, res) => {
+    const me = req.me, kind = req.query.kind === "audio" ? "audio" : "video";
+    if (kind === "video" ? limited(req, "video:" + me.id, 15, 24 * 3600_000) : limited(req, "voice:" + me.id, 300, 24 * 3600_000))
+      return bad(res, kind === "video" ? "You have added many videos today. Please try tomorrow." : "You have sent many voice messages today. Please try tomorrow.", 429);
+    if (kind === "audio" && Buffer.isBuffer(req.body) && req.body.length > AUDIO_MAX) return bad(res, "This voice message is too long. Please keep it under 2 minutes.", 413);
+    if (diskFree() < MIN_FREE_DISK + (req.body ? req.body.length : 0)) return bad(res, "Space on the server is full for now. Please post text only; the owner has been told.", 507);
+    const ext = sniff(req.body, kind);
+    if (!ext) return bad(res, kind === "video" ? "Please choose a video (MP4 or WebM, as recorded by your phone)." : "This voice message could not be read. Please try again.");
+    const name = crypto.randomBytes(16).toString("hex") + "." + ext;
+    fs.writeFileSync(path.join(MEDIA, name), req.body);
+    db.prepare("INSERT INTO s_media(name, user_id, bytes, created_at) VALUES(?,?,?,?)").run(name, me.id, req.body.length, now());
+    res.json({ id: name });
+  });
+  function takeMedia(name, userId, kind = "photo") {
+    if (!MEDIA_RX.test(String(name)) || mediaKind(name) !== kind) return null;
     const row = db.prepare("SELECT name FROM s_media WHERE name = ? AND user_id = ?").get(name, userId);
     if (!row) return null;
     db.prepare("UPDATE s_media SET used = 1 WHERE name = ?").run(name);
@@ -286,14 +315,14 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Photos nobody used within a day (chosen but never posted) are removed.
   setInterval(() => { for (const m of db.prepare("SELECT name FROM s_media WHERE used = 0 AND created_at < ?").all(now() - 24 * 3600_000)) dropMedia(m.name); }, 3600_000).unref();
   r.get("/media/:name", (req, res, next) => {
-    if (!/^[a-f0-9]{32}\.jpg$/.test(req.params.name)) return next();
+    if (!MEDIA_RX.test(req.params.name)) return next();
     res.set("Cache-Control", "public, max-age=31536000, immutable").set("X-Robots-Tag", "noindex");
     res.sendFile(path.join(MEDIA, req.params.name), err => { if (err && !res.headersSent) res.status(404).end(); });
   });
 
   // ---------- posts ----------
   const postOut = (p, meId) => ({
-    id: p.id, text: p.text || "", photo: p.photo ? "/media/" + p.photo : null, status: p.status,
+    id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
     likes: p.likes, comments: p.comments, created_at: p.created_at,
     liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
     mine: meId === p.user_id,
@@ -308,11 +337,12 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   r.post("/api/s/posts", login, (req, res) => {
     const b = req.body || {}, me = req.me;
     const text = para(b.text, TEXT_MAX);
-    if (!text && !b.photo) return bad(res, "Write something or add a photo.");
+    if (!text && !b.photo && !b.video) return bad(res, "Write something or add a photo or video.");
     if (isBad(text, false)) return bad(res, "Please remove rude, sexual or abusive words. Qindia is a family place.");
     if (limited(req, "post:" + me.id, 30, 3600_000)) return bad(res, "You have posted a lot in the last hour. Please wait a little.", 429);
-    let photo = null;
-    if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
+    let photo = null; // the photo or the video (s_posts.photo holds either; the file name says which)
+    if (b.video) { photo = takeMedia(b.video, me.id, "video"); if (!photo) return bad(res, "The video was not found. Please choose it again."); }
+    else if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
     const status = isDoubtful(text) || me.reports >= 3 || (photo && photoApproval()) ? "pending" : "ok";
     const id = db.prepare("INSERT INTO s_posts(user_id, text, photo, status, created_at) VALUES(?,?,?,?,?)").run(me.id, text || null, photo, status, now()).lastInsertRowid;
     res.json({ post: postOut(db.prepare(POST_SQL + " WHERE p.id = ?").get(id), me.id) });
@@ -325,6 +355,13 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const who = tab === "following" ? ` AND (p.user_id = ${meId} OR p.user_id IN (SELECT followee_id FROM s_follows WHERE follower_id = ${meId}))` : "";
     const rows = db.prepare(`${POST_SQL} WHERE ${visible(meId)}${notBlocked(meId)}${who} AND p.id < ? ORDER BY p.id DESC LIMIT ${PAGE}`).all(before(req));
     res.json({ posts: rows.map(p => postOut(p, meId)), more: rows.length === PAGE });
+  });
+
+  // Reels: short videos from everyone, newest first.
+  r.get("/api/s/reels", optional, (req, res) => {
+    const meId = req.me && req.me.status === "ok" ? req.me.id : 0;
+    const rows = db.prepare(`${POST_SQL} WHERE ${visible(meId)}${notBlocked(meId)} AND (p.photo LIKE '%.mp4' OR p.photo LIKE '%.webm') AND p.id < ? ORDER BY p.id DESC LIMIT 10`).all(before(req));
+    res.json({ posts: rows.map(p => postOut(p, meId)), more: rows.length === 10 });
   });
 
   r.get("/api/s/posts/:id", optional, (req, res) => {
@@ -507,7 +544,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       chats: rows.filter(c => c.ustatus === "ok").map(c => {
         const read = side(c, me.id) === "a" ? c.a_read : c.b_read;
         return {
-          user: pubUser(c), last: c.last_photo && !c.last_text ? "📷 Photo" : c.last_text || "", lastMine: c.last_sender === me.id, at: c.last_at,
+          user: pubUser(c), last: c.last_photo && !c.last_text ? (mediaKind(c.last_photo) === "audio" ? "🎤 Voice message" : "📷 Photo") : c.last_text || "", lastMine: c.last_sender === me.id, at: c.last_at,
           unread: c.last_sender !== me.id && c.last_at > read,
           request: c.mine === 0 && !follows(me.id, c.uid),
         };
@@ -542,24 +579,25 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const otherRead = c ? (side(c, me.id) === "a" ? c.b_read : c.a_read) : 0;
     res.json({
       user: { ...pubUser(u), last_seen: u.last_seen }, blocked: blockedEither(me.id, u.id), cannot: canSend(me, u, c), otherRead,
-      messages: msgs.map(m => ({ id: m.id, mine: m.sender_id === me.id, text: m.text || "", photo: m.photo ? "/media/" + m.photo : null, at: m.created_at })),
+      messages: msgs.map(m => ({ id: m.id, mine: m.sender_id === me.id, text: m.text || "", photo: null, ...mediaOut(m.photo), at: m.created_at })),
     });
   });
   r.post("/api/s/chats/:username", login, (req, res) => {
     const u = target(req), me = req.me, b = req.body || {};
     if (!u || u.id === me.id) return bad(res, "This person was not found.", 404);
     const text = para(b.text, MESSAGE_MAX);
-    if (!text && !b.photo) return bad(res, "Write a message.");
+    if (!text && !b.photo && !b.audio) return bad(res, "Write a message.");
     let c = convoWith(me.id, u.id, false);
     if (limited(req, "msg:" + me.id, 300, 3600_000) || (!c && limited(req, "newchat:" + me.id, 40, 24 * 3600_000)))
       return bad(res, "You are sending too many messages. Please wait a little.", 429);
     const why = canSend(me, u, c);
     if (why) return bad(res, why, 403);
     // Photos in private chats only between people who follow each other (so strangers cannot send pictures).
-    let photo = null;
-    if (b.photo) {
-      if (!(follows(me.id, u.id) && follows(u.id, me.id))) return bad(res, "You can send photos only when you both follow each other.", 403);
-      photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again.");
+    // Photos and voice messages in private chats only between people who follow each other (so strangers cannot send them).
+    let photo = null; // the photo or the voice message (s_messages.photo holds either; the file name says which)
+    if (b.photo || b.audio) {
+      if (!(follows(me.id, u.id) && follows(u.id, me.id))) return bad(res, b.audio ? "You can send voice messages only when you both follow each other." : "You can send photos only when you both follow each other.", 403);
+      photo = b.audio ? takeMedia(b.audio, me.id, "audio") : takeMedia(b.photo, me.id); if (!photo) return bad(res, "The file was not found. Please try again.");
     }
     c = c || convoWith(me.id, u.id, true);
     const t = now();
@@ -576,7 +614,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   });
 
   // ---------- group chats and Status / Stories (server/qindia-groups.js, server/qindia-stories.js) ----------
-  const ext = { db, r, login, bad, now, line, para, takeMedia, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
+  const ext = { db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
     reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
   require("./qindia-groups")(ext);
   require("./qindia-stories")(ext);

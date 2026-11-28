@@ -8,7 +8,7 @@ const GROUP_MAX = 500;            // members in one group
 const NAME_MAX = 60, ABOUT_MAX = 500, MESSAGE_MAX = 2000;
 
 module.exports = function groups(x) {
-  const { db, r, login, bad, now, line, para, takeMedia, dropMedia, pubUser, blockedEither, follows, limited, isBad, hold } = x;
+  const { db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, hold } = x;
   db.exec(`
 CREATE TABLE IF NOT EXISTS s_groups (
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, about TEXT, avatar TEXT,
@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS s_group_msgs_group ON s_group_msgs(group_id, id);
     res.json({
       groups: rows.map(g => {
         const m = g.last_id && db.prepare("SELECT m.*, u.name AS uname FROM s_group_msgs m LEFT JOIN s_users u ON u.id = m.sender_id WHERE m.id = ?").get(g.last_id);
-        const last = !m ? "" : m.kind === "info" ? m.text : (m.sender_id === me.id ? "You" : m.uname || "Someone") + ": " + (m.photo && !m.text ? "📷 Photo" : m.text || "");
+        const last = !m ? "" : m.kind === "info" ? m.text : (m.sender_id === me.id ? "You" : m.uname || "Someone") + ": " + (m.photo && !m.text ? (mediaKind(m.photo) === "audio" ? "🎤 Voice message" : "📷 Photo") : m.text || "");
         return { id: g.id, name: g.name, avatar: avatarUrl(g.avatar), members: g.members, admin: g.role === "admin", closed: g.status !== "ok", last, at: g.last_at,
           unread: g.status === "ok" && !!m && m.kind === "msg" && m.sender_id !== me.id && m.created_at > g.read_at };
       }),
@@ -127,7 +127,7 @@ CREATE INDEX IF NOT EXISTS s_group_msgs_group ON s_group_msgs(group_id, id);
       group: { id: g.id, name: g.name, about: g.about || "", avatar: avatarUrl(g.avatar), onlyAdmins: !!g.only_admins, members: count(g.id), admin: m.role === "admin", created_at: g.created_at,
         invite: m.role === "admin" || !g.only_admins ? g.invite : null },
       cannot: g.only_admins && m.role !== "admin" ? "Only admins can send messages in this group." : "",
-      messages: msgs.map(x => ({ id: x.id, info: x.kind === "info", mine: x.sender_id === me.id, text: x.text || "", photo: x.photo ? "/media/" + x.photo : null, at: x.created_at,
+      messages: msgs.map(x => ({ id: x.id, info: x.kind === "info", mine: x.sender_id === me.id, text: x.text || "", photo: null, ...mediaOut(x.photo), at: x.created_at,
         user: x.sender_id ? pubUser(x) : null })),
     };
     if (!after) out.people = db.prepare("SELECT u.*, gm.role FROM s_group_members gm JOIN s_users u ON u.id = gm.user_id WHERE gm.group_id = ? ORDER BY gm.role = 'admin' DESC, u.name LIMIT ?").all(g.id, GROUP_MAX)
@@ -140,10 +140,11 @@ CREATE INDEX IF NOT EXISTS s_group_msgs_group ON s_group_msgs(group_id, id);
     const { g, m } = x;
     if (g.only_admins && m.role !== "admin") return bad(res, "Only admins can send messages in this group.", 403);
     const text = para(b.text, MESSAGE_MAX);
-    if (!text && !b.photo) return bad(res, "Write a message.");
+    if (!text && !b.photo && !b.audio) return bad(res, "Write a message.");
     if (limited(req, "msg:" + me.id, 300, 3600_000)) return bad(res, "You are sending too many messages. Please wait a little.", 429);
     let photo = null;
-    if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
+    if (b.audio) { photo = takeMedia(b.audio, me.id, "audio"); if (!photo) return bad(res, "The voice message was not found. Please try again."); }
+    else if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
     const t = now();
     const id = db.prepare("INSERT INTO s_group_msgs(group_id, sender_id, text, photo, created_at) VALUES(?,?,?,?,?)").run(g.id, me.id, text || null, photo, t).lastInsertRowid;
     db.prepare("UPDATE s_groups SET last_at = ? WHERE id = ?").run(t, g.id);
