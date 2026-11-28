@@ -172,3 +172,17 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .post .acts{position:relative}
 .share-menu{bottom:100%;top:auto;right:auto;left:50%;transform:translateX(-50%);min-width:260px}
 .cm .tabs a{font-size:15px}
+/* Watch (videos, channels) */
+.vgrid{display:grid;grid-template-columns:1fr;gap:16px;margin:10px 0}
+@media (min-width:560px){.vgrid{grid-template-columns:1fr 1fr}}
+.vt{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:var(--ink);min-width:0}
+.vt .thumb{position:relative;display:block;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+.vt .thumb img,.vt .thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.vt .thumb i{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.8);color:#fff;font:600 12px/1 system-ui;font-style:normal;border-radius:4px;padding:3px 5px}
+.vt b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.3}
+.vt small{display:block;margin-top:2px;font-size:13px}
+.watch{margin:10px -16px 0;background:#000}
+@media (min-width:672px){.watch{margin:10px 0 0;border-radius:14px;overflow:hidden}}
+.player{display:block;width:100%;max-height:70vh;aspect-ratio:16/9;background:#000}
+.cm h1.vtitle{font-size:19px;margin:10px 0 4px;overflow-wrap:anywhere}
+.watchlink{display:block;padding:6px 14px;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}

@@ -12,6 +12,7 @@ const PAGE = 20;
 const PHOTO_MAX = 3 * 1024 * 1024;        // 3 MB per photo after the phone shrinks it (usually 200-500 KB)
 const MIN_FREE_DISK = 2 * 1024 ** 3;       // stop taking photos when less than 2 GB is free on the server
 const VIDEO_MAX = 40 * 1024 * 1024;       // 40 MB per short video (about 1 minute at 720p); the phone checks the length
+const LONG_VIDEO_MAX = 100 * 1024 * 1024; // 100 MB per longer video for Watch (up to 10 minutes at 480p-720p)
 const AUDIO_MAX = 3 * 1024 * 1024;        // 3 MB per voice message (2 minutes is about 1 MB)
 // Media files: <32 hex>.<ext>. The extension tells the kind: jpg = photo, mp4/webm = video, m4a/weba/ogg = voice.
 const MEDIA_RX = /^[a-f0-9]{32}\.(jpg|mp4|webm|m4a|weba|ogg)$/;
@@ -85,6 +86,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES s_users(id) ON DELETE CASCADE,
   created_at INTEGER NOT NULL, PRIMARY KEY (provider, subject))`);
   // Added later: posts made as a Page (page_id) and shares of another post (share_of).
+  // Added later for Watch (YouTube-style videos): cover picture, length in seconds, and views.
+  for (const col of ["poster TEXT", "duration INTEGER", "views INTEGER NOT NULL DEFAULT 0"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col.split(" ")[0])) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col}`);
+  db.exec("CREATE TABLE IF NOT EXISTS s_views (post_id INTEGER NOT NULL REFERENCES s_posts(id) ON DELETE CASCADE, viewer TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (post_id, viewer))");
   for (const col of ["page_id", "share_of"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col)) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col} INTEGER`);
   db.exec("CREATE INDEX IF NOT EXISTS s_posts_page ON s_posts(page_id, id)");
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
@@ -290,8 +294,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     if (kind === "audio") return ftyp ? "m4a" : webm ? "weba" : ogg ? "ogg" : null;
     return null;
   }
-  r.post("/api/s/upload-av", login, express.raw({ type: () => true, limit: VIDEO_MAX }), (req, res) => {
+  r.post("/api/s/upload-av", login, express.raw({ type: () => true, limit: LONG_VIDEO_MAX }), (req, res) => {
     const me = req.me, kind = req.query.kind === "audio" ? "audio" : "video";
+    if (kind === "video" && req.query.long !== "1" && Buffer.isBuffer(req.body) && req.body.length > VIDEO_MAX) return bad(res, "This video is too big for a short video.", 413);
     if (kind === "video" ? limited(req, "video:" + me.id, 15, 24 * 3600_000) : limited(req, "voice:" + me.id, 300, 24 * 3600_000))
       return bad(res, kind === "video" ? "You have added many videos today. Please try tomorrow." : "You have sent many voice messages today. Please try tomorrow.", 429);
     if (kind === "audio" && Buffer.isBuffer(req.body) && req.body.length > AUDIO_MAX) return bad(res, "This voice message is too long. Please keep it under 2 minutes.", 413);
@@ -327,6 +332,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   const postOut = (p, meId, inner = false) => {
     const out = {
       id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
+      ...(mediaKind(p.photo) === "video" ? { poster: p.poster ? "/media/" + p.poster : null, duration: p.duration || 0, views: p.views || 0 } : {}),
       likes: p.likes, comments: p.comments, created_at: p.created_at,
       liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
       mine: meId === p.user_id,
@@ -365,10 +371,15 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     if (isBad(text, false)) return bad(res, "Please remove rude, sexual or abusive words. Qindia is a family place.");
     if (limited(req, "post:" + me.id, 30, 3600_000)) return bad(res, "You have posted a lot in the last hour. Please wait a little.", 429);
     let photo = null; // the photo or the video (s_posts.photo holds either; the file name says which)
-    if (b.video) { photo = takeMedia(b.video, me.id, "video"); if (!photo) return bad(res, "The video was not found. Please choose it again."); }
+    let poster = null, duration = null;
+    if (b.video) {
+      photo = takeMedia(b.video, me.id, "video"); if (!photo) return bad(res, "The video was not found. Please choose it again.");
+      if (b.poster) poster = takeMedia(b.poster, me.id); // cover picture made by the phone from the video
+      duration = Math.max(0, Math.min(36000, Math.round(Number(b.duration) || 0))) || null;
+    }
     else if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
     const status = isDoubtful(text) || me.reports >= 3 || (photo && photoApproval()) ? "pending" : "ok";
-    const id = db.prepare("INSERT INTO s_posts(user_id, text, photo, status, created_at, page_id, share_of) VALUES(?,?,?,?,?,?,?)").run(me.id, text || null, photo, status, now(), pageId, shareOf).lastInsertRowid;
+    const id = db.prepare("INSERT INTO s_posts(user_id, text, photo, status, created_at, page_id, share_of, poster, duration) VALUES(?,?,?,?,?,?,?,?,?)").run(me.id, text || null, photo, status, now(), pageId, shareOf, poster, duration).lastInsertRowid;
     if (shareOf && status === "ok") { const o = db.prepare("SELECT user_id FROM s_posts WHERE id = ?").get(shareOf); if (o) notify(o.user_id, "share", me.id, id); }
     res.json({ post: postOut(db.prepare(POST_SQL + " WHERE p.id = ?").get(id), me.id) });
   });
@@ -385,7 +396,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // Reels: short videos from everyone, newest first.
   r.get("/api/s/reels", optional, (req, res) => {
     const meId = req.me && req.me.status === "ok" ? req.me.id : 0;
-    const rows = db.prepare(`${POST_SQL} WHERE ${visible(meId)}${notBlocked(meId)} AND (p.photo LIKE '%.mp4' OR p.photo LIKE '%.webm') AND p.id < ? ORDER BY p.id DESC LIMIT 10`).all(before(req));
+    const rows = db.prepare(`${POST_SQL} WHERE ${visible(meId)}${notBlocked(meId)} AND (p.photo LIKE '%.mp4' OR p.photo LIKE '%.webm') AND IFNULL(p.duration, 0) <= 95 AND p.id < ? ORDER BY p.id DESC LIMIT 10`).all(before(req));
     res.json({ posts: rows.map(p => postOut(p, meId)), more: rows.length === 10 });
   });
 
@@ -404,7 +415,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   r.post("/api/s/posts/:id/delete", login, (req, res) => {
     const p = db.prepare("SELECT * FROM s_posts WHERE id = ? AND user_id = ?").get(Number(req.params.id), req.me.id);
     if (!p) return bad(res, "Not found.", 404);
-    db.prepare("DELETE FROM s_posts WHERE id = ?").run(p.id); dropMedia(p.photo);
+    db.prepare("DELETE FROM s_posts WHERE id = ?").run(p.id); dropMedia(p.photo); dropMedia(p.poster);
     res.json({ ok: true });
   });
 
@@ -643,8 +654,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
   require("./qindia-groups")(ext);
   require("./qindia-stories")(ext);
-  Object.assign(ext, { POST_SQL, visible, notBlocked, postOut, before, PAGE });
+  Object.assign(ext, { POST_SQL, visible, notBlocked, postOut, before, PAGE, ipHash, who });
   require("./qindia-pages")(ext);
+  require("./qindia-watch")(ext);
 
   // ---------- owner: community moderation on /admin ----------
   r.get("/api/admin/community", owner, (req, res) => {
@@ -686,8 +698,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       case "post-ok": db.prepare("UPDATE s_posts SET status = 'ok', reports = 0 WHERE id = ?").run(id); finish("post", id); break;
       case "post-hide": db.prepare("UPDATE s_posts SET status = 'hidden' WHERE id = ?").run(id); finish("post", id); break;
       case "post-delete": {
-        const p = db.prepare("SELECT p.id, p.text, p.photo, p.created_at, u.username FROM s_posts p JOIN s_users u ON u.id = p.user_id WHERE p.id = ?").get(id);
+        const p = db.prepare("SELECT p.id, p.text, p.photo, p.poster, p.created_at, u.username FROM s_posts p JOIN s_users u ON u.id = p.user_id WHERE p.id = ?").get(id);
         db.prepare("DELETE FROM s_posts WHERE id = ?").run(id);
+        if (p) dropMedia(p.poster);
         if (p) { const kept = hold.keep("post", p.id, p, { photo: p.photo, reason: "removed by owner" }); if (kept) db.prepare("DELETE FROM s_media WHERE name = ?").run(kept); else dropMedia(p.photo); }
         finish("post", id); break;
       }

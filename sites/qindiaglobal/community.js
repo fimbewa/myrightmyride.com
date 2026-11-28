@@ -1,6 +1,6 @@
 // Q India Community: the page at qindiaglobal.com/community. One page; the part after # picks the screen:
 // #/ feed · #/new · #/p/<id> post · #/u/<username> profile · #/search · #/chats · #/chat/<username> · #/notifs · #/me · #/login · #/signup · #/recover
-// #/pages · #/pages/new · #/pg/<handle> · #/pg/<handle>/edit (Pages) · #/share/<post id> · #/reels (short videos) · #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
+// #/watch · #/watch/popular · #/watch/subs · #/watch/u/<username> · #/watch/pg/<handle> · #/v/<id> (Watch) · #/pages · #/pages/new · #/pg/<handle> · #/pg/<handle>/edit (Pages) · #/share/<post id> · #/reels (short videos) · #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
 (function () {
   "use strict";
   const view = document.getElementById("view");
@@ -281,7 +281,8 @@
       p.status === "pending" && h("p", { cls: "wait", text: "Only you can see this for now. The site owner checks photos and some posts before everyone sees them." }),
       p.text && h("div", { cls: "tx" }, richText(p.text)),
       p.photo && h("img", { cls: "pic", src: p.photo, alt: "Photo shared by " + p.user.name, loading: "lazy" }),
-      p.video && videoEl(p.video, { cls: "pic vid" }),
+      p.video && videoEl(p.video, { cls: "pic vid", poster: p.poster || null }),
+      p.video && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch" + (p.duration ? " · " + dur(p.duration) : "") + " · " + views(p.views)),
       p.shared && sharedBox(p.shared),
       h("div", { cls: "acts" }, likeBtn, full ? h("span", { cls: "muted", style: "flex:1;text-align:center;padding:8px", text: "💬 " + p.comments }) : h("a", { href: "#/p/" + p.id }, "💬 " + (p.comments || "") + " Comment"), share));
     return card;
@@ -308,7 +309,7 @@
     show(f);
   }
   function composer(after, page) {
-    const m = msgBox(); let photo = null, file = null, video = null;
+    const m = msgBox(); let photo = null, file = null, video = null, poster = null, vlen = 0;
     const prev = h("div", { cls: "prev", hidden: true });
     const f = h("form", { cls: "card compose" },
       h("div", { cls: "row" }, page ? avatar(page, "sm") : me && avatar(me, "sm"), h("b", { text: page ? "Post as " + page.name : "Share with the community" })),
@@ -325,8 +326,10 @@
         file = fl; photo = null; video = null; prev.hidden = false;
         const status = h("p", { cls: "muted", text: "Checking the video…" }); prev.replaceChildren(status);
         try {
-          await checkVideo(fl);
-          const id = await uploadAV(fl, "video", pc => { status.textContent = "Uploading video… " + pc + "%"; });
+          vlen = await checkVideo(fl);
+          const pb = await posterOf(fl);
+          poster = pb ? await api("/api/s/upload", { method: "POST", raw: pb }).then(r => r.id).catch(() => null) : null;
+          const id = await uploadAV(fl, "video", pc => { status.textContent = "Uploading video… " + pc + "%"; }, vlen > VIDEO_MAX_S + 1);
           if (file !== fl) return;
           video = id;
           const rm = h("button", { type: "button", cls: "sbtn" }, "✕ Remove"); rm.onclick = () => { video = null; file = null; prev.hidden = true; prev.replaceChildren(); };
@@ -338,7 +341,7 @@
       if (file && !photo && !video) return say(m, "Please wait until the photo or video is ready.");
       say(m, "Posting…", true);
       try {
-        const d = await api("/api/s/posts", { body: { text: f.text.value, photo, video, page: page ? page.handle : undefined } });
+        const d = await api("/api/s/posts", { body: { text: f.text.value, photo, video, poster: video ? poster : undefined, duration: video ? vlen : undefined, page: page ? page.handle : undefined } });
         f.reset(); photo = null; file = null; video = null; prev.hidden = true; prev.replaceChildren();
         say(m, d.post.status === "pending" ? "Posted. The site owner will check it soon; until then only you can see it." : "Posted.", true);
         after && after(d.post);
@@ -447,6 +450,7 @@
         me && ["Block", async () => { if (!confirm("Block @" + u.username + "? They will not be able to message you or see your posts.")) return; await api(`/api/s/users/${u.username}/block`, { body: {} }).catch(() => {}); route(); }],
       ]);
     }
+    btns.append(h("a", { cls: "sbtn", href: "#/watch/u/" + u.username }, "▶ Videos"));
     const head = h("div", { cls: "card prof" }, avatar(u, "big"), h("h1", { text: u.name }), h("div", { cls: "muted", text: "@" + u.username + (u.city ? " · " + u.city : "") + (u.followsMe && !u.me ? " · follows you" : "") }),
       u.bio && h("p", { cls: "bio" }, richText(u.bio)),
       h("div", { cls: "nums" }, h("span", {}, h("b", { text: u.posts }), "posts"), h("a", { href: `#/u/${u.username}/followers` }, h("b", { text: u.followers }), "followers"), h("a", { href: `#/u/${u.username}/following` }, h("b", { text: u.following }), "following")), btns);
@@ -655,6 +659,7 @@
       btns.append(fb);
       menu(btns, [["Report Page", () => report("page", pg.id)]]);
     }
+    btns.append(h("a", { cls: "sbtn", href: "#/watch/pg/" + pg.handle }, "▶ Videos"));
     const link = location.origin + "/community#/pg/" + pg.handle;
     btns.append(h("button", { cls: "sbtn", type: "button", onclick: () => navigator.share ? navigator.share({ title: pg.name, url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(pg.name + " on Q India Community: " + link), "_blank") }, "↗ Share"));
     const head = h("div", { cls: "card prof pg" }, pg.cover ? h("img", { cls: "cover", src: pg.cover, alt: "" }) : h("div", { cls: "cover" }), avatar(pg, "big"),
@@ -668,13 +673,88 @@
     show(head, pg.mine && !pg.closed && composer(p => { list.querySelector(".empty")?.remove(); list.prepend(postCard(p)); }, pg), list);
   }
 
+  // ---------- Watch (like YouTube): videos, channels, views ----------
+  const dur = s => { s = Math.round(s || 0); const hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, "0"); return hh ? hh + ":" + String(mm).padStart(2, "0") + ":" + ss : mm + ":" + ss; };
+  const views = n => (n >= 100000 ? (n / 100000).toFixed(1).replace(/\.0$/, "") + " lakh" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n || 0)) + " view" + (n === 1 ? "" : "s");
+  const titleOf = v => { const t = (v.text || "").split("\n")[0].trim(); return t ? ([...t].length > 90 ? [...t].slice(0, 90).join("") + "…" : t) : "Video by " + v.user.name; };
+  const videoTile = v => h("a", { cls: "vt", href: "#/v/" + v.id },
+    h("span", { cls: "thumb" }, v.poster ? h("img", { src: v.poster, alt: "", loading: "lazy" }) : h("video", { src: v.video + "#t=0.5", preload: "metadata", muted: true, playsinline: true }), v.duration > 0 && h("i", { text: dur(v.duration) })),
+    h("span", { cls: "row", style: "align-items:flex-start" }, avatar(v.user, "sm"), h("span", { cls: "grow" }, h("b", { text: titleOf(v) }), h("small", { cls: "muted", text: v.user.name + " · " + views(v.views) + " · " + ago(v.created_at) }))));
+  const watchTabs = on => h("div", { cls: "tabs" }, [["#/reels", "Reels", "reels"], ["#/watch", "Latest", "latest"], ["#/watch/popular", "Popular", "popular"], me && ["#/watch/subs", "Subscriptions", "subs"]].filter(Boolean)
+    .map(([href, label, k]) => h("a", { href, cls: on === k ? "on" : "" }, label)));
+  async function watchPage(a, b) {
+    const sort = a === "popular" || a === "subs" ? a : "latest";
+    const chan = a === "u" ? "user=" + encodeURIComponent(b) : a === "pg" ? "page=" + encodeURIComponent(b) : "";
+    const grid = h("div", { cls: "vgrid" });
+    const title = chan ? h("div", { cls: "row", style: "margin:14px 0 6px" }, h("a", { cls: "sbtn", href: (a === "pg" ? "#/pg/" : "#/u/") + b }, "←"), h("h1", { style: "margin:0", text: "Videos" })) : null;
+    show(title || h("h1", { text: "Watch" }), !chan && watchTabs(sort), !chan && me && h("p", {}, h("a", { cls: "sbtn main", href: "#/new" }, "＋ Upload a video")), grid);
+    let skip = 0;
+    const load = async () => {
+      let d; try { d = await api(`/api/s/watch?${chan || "sort=" + sort}&skip=${skip}`); } catch (e) { return grid.append(h("p", { cls: "empty", text: e.message })); }
+      grid.append(...d.videos.map(videoTile)); skip = d.next;
+      if (!skip) grid.append(h("p", { cls: "empty", text: sort === "subs" ? "Videos from people and Pages you follow will show here." : "No videos yet." }));
+      if (d.more) { const m = h("button", { cls: "sbtn loadmore" }, "Show more"); m.onclick = () => { m.remove(); load(); }; grid.after(m); }
+    };
+    await load();
+  }
+  async function videoPage(id) {
+    let d; try { d = await api("/api/s/watch/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const v = d.video, ch = d.channel;
+    const player = h("video", { cls: "player", src: v.video, poster: v.poster || null, controls: true, playsinline: true, autoplay: true, preload: "metadata" });
+    let counted = false;
+    player.onplay = () => { if (!counted) { counted = true; api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {}); } };
+    const sub = !ch.mine && h("button", { cls: "sbtn " + (ch.subscribed ? "" : "dark") }, ch.subscribed ? "Subscribed ✓" : "Subscribe");
+    if (sub) sub.onclick = async () => {
+      if (!me) return needLogin("Please log in to subscribe.");
+      try { await api(ch.page ? `/api/s/pages/${ch.username}/follow` : `/api/s/users/${ch.username}/follow`, { body: { follow: !ch.subscribed } }); ch.subscribed = !ch.subscribed; ch.subscribers += ch.subscribed ? 1 : -1;
+        sub.textContent = ch.subscribed ? "Subscribed ✓" : "Subscribe"; sub.className = "sbtn " + (ch.subscribed ? "" : "dark"); subs.textContent = ch.subscribers + " subscriber" + (ch.subscribers === 1 ? "" : "s"); } catch (e) { alertNote(e.message); }
+    };
+    const subs = h("small", { cls: "muted", text: ch.subscribers + " subscriber" + (ch.subscribers === 1 ? "" : "s") });
+    const like = h("button", { type: "button", cls: "sbtn" + (v.liked ? " main" : "") }, (v.liked ? "♥ " : "♡ ") + (v.likes || "") + " Like");
+    like.onclick = async () => {
+      if (!me) return needLogin("Please log in to like videos.");
+      try { const r = await api(`/api/s/posts/${v.id}/like`, { body: { like: !v.liked } }); v.liked = r.liked; v.likes = r.likes; like.className = "sbtn" + (v.liked ? " main" : ""); like.textContent = (v.liked ? "♥ " : "♡ ") + (v.likes || "") + " Like"; } catch (e) { alertNote(e.message); }
+    };
+    const link = location.origin + "/community#/v/" + v.id;
+    const desc = (v.text || "").split("\n").slice(1).join("\n").trim();
+    show(h("div", { cls: "watch" }, player),
+      h("h1", { cls: "vtitle", text: titleOf(v) }), h("p", { cls: "muted", style: "margin:0", text: views(v.views) + " · " + ago(v.created_at) }),
+      v.status === "pending" && h("p", { cls: "note", text: "Only you can see this until the site owner checks it." }),
+      h("div", { cls: "row", style: "margin:10px 0;flex-wrap:wrap" }, h("a", { cls: "row who grow", href: (ch.page ? "#/watch/pg/" : "#/watch/u/") + ch.username }, avatar(ch), h("span", { cls: "grow" }, h("b", { text: ch.name }), subs)), sub),
+      h("div", { cls: "row", style: "flex-wrap:wrap" }, like, h("a", { cls: "sbtn", href: "#/p/" + v.id }, "💬 " + (v.comments || "") + " Comments"),
+        h("button", { cls: "sbtn", type: "button", onclick: () => navigator.share ? navigator.share({ title: titleOf(v), url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(titleOf(v) + " " + link), "_blank") }, "↗ Share"),
+        !v.mine && h("button", { cls: "sbtn", type: "button", onclick: () => report("post", v.id) }, "⚑ Report")),
+      desc && h("div", { cls: "card", style: "white-space:pre-wrap" }, richText(desc)),
+      d.next.length > 0 && h("h2", { text: "Up next" }), h("div", { cls: "vgrid" }, d.next.map(videoTile)));
+  }
+  // A cover picture for a video, taken from the video on the phone (about a third of the way in).
+  function posterOf(file) {
+    return new Promise(ok => {
+      const v = document.createElement("video"), url = URL.createObjectURL(file);
+      v.muted = true; v.playsInline = true; v.preload = "auto";
+      const done = b => { URL.revokeObjectURL(url); ok(b); };
+      v.onloadeddata = () => { v.currentTime = Math.min(2, (v.duration || 3) / 3); };
+      v.onseeked = () => {
+        try {
+          const k = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight)), c = document.createElement("canvas");
+          c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+          c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); c.toBlob(done, "image/jpeg", 0.8);
+        } catch { done(null); }
+      };
+      v.onerror = () => done(null);
+      setTimeout(() => done(null), 8000);
+      v.src = url;
+    });
+  }
+
   // ---------- short videos and voice messages ----------
-  const VIDEO_MAX_MB = 40, VIDEO_MAX_S = 90, VOICE_MAX_S = 120;
+  // Short videos (Reels) up to 90 seconds / 40 MB; longer videos (Watch) up to 10 minutes / 100 MB.
+  const VIDEO_MAX_MB = 40, VIDEO_MAX_S = 90, LONG_MAX_MB = 100, LONG_MAX_S = 600, VOICE_MAX_S = 120;
   // Sends a video or voice file, showing progress (videos can take a while on mobile data).
-  function uploadAV(blob, kind, onProgress) {
+  function uploadAV(blob, kind, onProgress, long) {
     return new Promise((ok, no) => {
       const x = new XMLHttpRequest();
-      x.open("POST", "/api/s/upload-av?kind=" + kind);
+      x.open("POST", "/api/s/upload-av?kind=" + kind + (long ? "&long=1" : ""));
       x.setRequestHeader("content-type", "application/octet-stream");
       if (tok) x.setRequestHeader("authorization", "Bearer " + tok);
       if (onProgress) x.upload.onprogress = e => e.lengthComputable && onProgress(Math.round(100 * e.loaded / e.total));
@@ -683,13 +763,19 @@
       x.send(blob);
     });
   }
-  // Checks a video from the phone: size and length.
+  // Checks a video from the phone: size and length. Gives back its length in seconds.
   function checkVideo(file) {
     return new Promise((ok, no) => {
-      if (file.size > VIDEO_MAX_MB * 1048576) return no(new Error("This video is " + Math.round(file.size / 1048576) + " MB. Please choose one up to " + VIDEO_MAX_MB + " MB (about 1 minute; record in 720p to keep it small)."));
+      const mb = Math.round(file.size / 1048576);
+      if (file.size > LONG_MAX_MB * 1048576) return no(new Error("This video is " + mb + " MB. Please choose one up to " + LONG_MAX_MB + " MB (record in 720p or 480p to keep it small)."));
       const v = document.createElement("video"), url = URL.createObjectURL(file);
       v.preload = "metadata"; v.muted = true;
-      v.onloadedmetadata = () => { const d = v.duration; URL.revokeObjectURL(url); d > VIDEO_MAX_S + 1 ? no(new Error("This video is " + Math.round(d) + " seconds long. Please choose one up to " + VIDEO_MAX_S + " seconds.")) : ok(); };
+      v.onloadedmetadata = () => {
+        const d = v.duration; URL.revokeObjectURL(url);
+        if (d > LONG_MAX_S + 1) return no(new Error("This video is " + Math.round(d / 60) + " minutes long. Please choose one up to " + LONG_MAX_S / 60 + " minutes."));
+        if (d <= VIDEO_MAX_S + 1 && file.size > VIDEO_MAX_MB * 1048576) return no(new Error("This short video is " + mb + " MB. Please choose one up to " + VIDEO_MAX_MB + " MB (record in 720p)."));
+        ok(d);
+      };
       v.onerror = () => { URL.revokeObjectURL(url); no(new Error("This video cannot be played in the browser. Please choose an MP4 video.")); };
       v.src = url;
     });
@@ -733,7 +819,7 @@
   // ---------- Reels: short videos, one screen each ----------
   async function reelsPage() {
     const list = h("div", { cls: "reels" });
-    const top = h("div", { cls: "row", style: "margin:10px 0" }, h("h1", { cls: "grow", style: "margin:0", text: "Reels" }), me ? h("a", { cls: "sbtn main", href: "#/new" }, "＋ Add a video") : h("a", { cls: "sbtn main", href: "#/signup" }, "Join to add videos"));
+    const top = h("div", {}, watchTabs("reels"));
     show(top, list);
     // Fill the screen between the title and the menu bar at the bottom.
     const fit = () => { if (!view.contains(list)) return removeEventListener("resize", fit); list.style.height = Math.max(360, innerHeight - list.getBoundingClientRect().top - window.scrollY - document.getElementById("nav").offsetHeight - 8) + "px"; };
@@ -1032,7 +1118,7 @@
     clearInterval(timer); timer = null; clearTimeout(storyTimer);
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [a, b, c] = parts;
-    const nav = { "": "home", following: "home", all: "home", pages: "home", pg: "home", share: "home", search: "search", reels: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
+    const nav = { "": "home", following: "home", all: "home", pages: "home", pg: "home", share: "home", search: "search", reels: "reels", watch: "reels", v: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
     document.querySelectorAll("[data-nav]").forEach(x => x.classList.toggle("on", x.dataset.nav === nav));
     window.scrollTo(0, 0);
     switch (a || "") {
@@ -1047,6 +1133,8 @@
       case "u": return profilePage(b, c === "followers" || c === "following" ? c : null);
       case "search": return searchPage();
       case "reels": return reelsPage();
+      case "watch": return watchPage(b, c);
+      case "v": return videoPage(Number(b));
       case "pages": return b === "new" ? pageForm() : pagesPage();
       case "pg": return c === "edit" ? pageForm(b) : pageView(b);
       case "share": return sharePage(Number(b));
