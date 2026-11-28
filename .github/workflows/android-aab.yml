@@ -63,6 +63,10 @@ jobs:
             cp android/app/build/outputs/apk/release/app-release.apk "out/qindiaglobal-$V-test-phone.apk"
           else
             cp android/app/build/outputs/bundle/release/app-release.aab "out/qindiaglobal-$V-UNSIGNED.aab"
+            # Unsigned phone APK plus Google's apksigner/zipalign, so the APK can be signed offline too.
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk "out/qindiaglobal-$V-UNSIGNED.apk"
+            BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+            mkdir -p out/tools && cp "$BT/lib/apksigner.jar" "$BT/zipalign" out/tools/
           fi
           ls -l out
 
