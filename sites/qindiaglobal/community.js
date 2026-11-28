@@ -62,6 +62,8 @@
     allow: "accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin" }));
   const ytThumb = id => "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
   const msgBox = () => h("p", { cls: "msg" });
+  // ✨ Writing help (write-help.js): ideas, tidy-up, translate and hashtags. Free: on-device AI where the browser has it, simple helpers everywhere else.
+  const writeHelp = (ta, kind, max) => { try { return window.QI_WRITE ? QI_WRITE.panel(ta, { kind, max }) : null; } catch { return null; } };
   const say = (box, text, ok) => { box.textContent = text; box.className = "msg " + (ok ? "ok" : "bad"); };
   function needLogin(why) {
     show(h("div", { cls: "card" }, h("h1", { text: "Join Q India Community" }), h("p", { text: why || "Please log in or create a free account to do this." }),
@@ -320,9 +322,11 @@
   function composer(after, page) {
     const m = msgBox(); let photo = null, file = null, video = null, poster = null, vlen = 0;
     const prev = h("div", { cls: "prev", hidden: true });
+    const ta = h("textarea", { name: "text", maxlength: 5000, placeholder: mediaOn() ? "What's happening? Share a good queue you saw, a tip, or a photo." : "What's happening? Share a good queue you saw, a tip, or paste a link (YouTube, Instagram, news…)." });
+    const help = writeHelp(ta, "post", 5000);
     const f = h("form", { cls: "card compose" },
       h("div", { cls: "row" }, page ? avatar(page, "sm") : me && avatar(me, "sm"), h("b", { text: page ? "Post as " + page.name : "Share with the community" })),
-      h("textarea", { name: "text", maxlength: 5000, placeholder: mediaOn() ? "What's happening? Share a good queue you saw, a tip, or a photo." : "What's happening? Share a good queue you saw, a tip, or paste a link (YouTube, Instagram, news…)." }), prev,
+      ta, help, prev,
       h("div", { cls: "row" }, photoPicker(async fl => {
         file = fl; photo = null; video = null; prev.hidden = false; prev.replaceChildren(h("p", { cls: "muted", text: "Preparing photo…" }));
         try {
@@ -955,7 +959,7 @@
     const pick = photoPicker(fl => { file = fl; photo = null; stage.querySelector("img")?.remove(); stage.prepend(h("img", { src: URL.createObjectURL(fl), alt: "" })); colour.hidden = true; paint(); });
     const f = h("form", { cls: "card" }, h("h1", { text: "New status" }),
       h("p", { cls: "muted", text: "Your followers see it at the top of their feed for 24 hours, then it disappears." }),
-      stage, h("div", { cls: "row" }, pick, colour), h("button", { cls: "btn" }, "Share status"), m);
+      stage, h("div", { cls: "row" }, pick, colour), writeHelp(ta, "status", 700), h("button", { cls: "btn" }, "Share status"), m);
     f.onsubmit = async e => {
       e.preventDefault();
       if (!ta.value.trim() && !file) return say(m, mediaOn() ? "Type something or choose a photo." : "Type something first.");
