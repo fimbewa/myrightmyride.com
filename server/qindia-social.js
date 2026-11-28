@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // IT Intermediary Rules 2021, rule 3(1)(c): remind every member of the rules at least once every three months
   // and whenever the rules change. RULES_DATE is the "last updated" date of /legal/terms.
   if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "rules_seen")) db.exec("ALTER TABLE s_users ADD COLUMN rules_seen INTEGER");
-  const RULES_DATE = Date.UTC(2026, 10, 26), REMIND_MS = 90 * 24 * 3600_000;
+  const RULES_DATE = Date.UTC(2026, 10, 28), REMIND_MS = 90 * 24 * 3600_000;
   const rulesDue = u => !u.rules_seen || u.rules_seen < RULES_DATE || Date.now() - u.rules_seen > REMIND_MS;
 
   const r = express.Router();
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     res.json({
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
-      messages: unreadChats(me.id),
+      messages: unreadChats(me.id) + ext.unreadGroups(me.id),
       rulesDue: rulesDue(me), hasPassword: !!me.pass_set,
       linked: db.prepare("SELECT provider FROM s_identities WHERE user_id = ?").all(me.id).map(x => x.provider),
     });
@@ -230,11 +230,14 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const u = db.prepare("SELECT id, username, name, city, status, ip_hash, created_at, last_seen FROM s_users WHERE id = ?").get(id);
     if (u) hold.keep("account", u.id, u, { reason });
     const files = db.prepare("SELECT name FROM s_media WHERE user_id = ?").all(id).map(x => x.name);
+    let tidy = () => {};
     db.transaction(() => {
+      tidy = ext.beforeUserDelete(id);
       for (const c of db.prepare("SELECT DISTINCT post_id FROM s_comments WHERE user_id = ?").all(id)) db.prepare("UPDATE s_posts SET comments = MAX(0, comments - (SELECT COUNT(*) FROM s_comments WHERE post_id = ? AND user_id = ?)) WHERE id = ?").run(c.post_id, id, c.post_id);
       for (const l of db.prepare("SELECT post_id FROM s_likes WHERE user_id = ?").all(id)) db.prepare("UPDATE s_posts SET likes = MAX(0, likes - 1) WHERE id = ?").run(l.post_id);
       db.prepare("DELETE FROM s_users WHERE id = ?").run(id); // everything else goes with it (ON DELETE CASCADE)
     })();
+    tidy();
     for (const f of files) fs.rm(path.join(MEDIA, f), () => {});
   }
 
@@ -453,13 +456,15 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     if (limited(req, "sreport:" + me.id, 30, 3600_000)) return bad(res, "Too many reports.", 429);
     let id = Number(b.id);
     if (kind === "user") { const u = db.prepare("SELECT id FROM s_users WHERE username = ?").get(String(b.id || "").toLowerCase()); id = u ? u.id : 0; }
-    const tbl = { post: "s_posts", comment: "s_comments", user: "s_users" }[kind];
-    if (kind === "message") {
+    const tbl = { post: "s_posts", comment: "s_comments", user: "s_users" }[kind], more = ext.reportKinds[kind];
+    if (more) { if (!more.ok(me, id)) return bad(res, "Not found.", 404); }
+    else if (kind === "message") {
       const m = db.prepare("SELECT m.* FROM s_messages m JOIN s_convos c ON c.id = m.convo_id WHERE m.id = ? AND (c.a_id = ? OR c.b_id = ?) AND m.sender_id != ?").get(id, me.id, me.id, me.id);
       if (!m) return bad(res, "Not found.", 404);
       db.prepare("UPDATE s_messages SET reported = 1 WHERE id = ?").run(id); // only reported messages are shown to the owner
     } else if (!tbl || !db.prepare(`SELECT 1 FROM ${tbl} WHERE id = ?`).get(id)) return bad(res, "Not found.", 404);
     const fresh = db.prepare("INSERT OR IGNORE INTO s_reports(kind, target_id, reporter_id, reason, created_at) VALUES(?,?,?,?,?)").run(kind, id, me.id, reason || null, now()).changes;
+    if (fresh && more) more.bump(id);
     if (fresh && tbl) {
       db.prepare(`UPDATE ${tbl} SET reports = reports + 1 WHERE id = ?`).run(id);
       // Three different people reporting a post or comment hides it until the owner looks.
@@ -570,6 +575,12 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     res.json({ ok: true });
   });
 
+  // ---------- group chats and Status / Stories (server/qindia-groups.js, server/qindia-stories.js) ----------
+  const ext = { db, r, login, bad, now, line, para, takeMedia, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
+    reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
+  require("./qindia-groups")(ext);
+  require("./qindia-stories")(ext);
+
   // ---------- owner: community moderation on /admin ----------
   r.get("/api/admin/community", owner, (req, res) => {
     const day = now() - 24 * 3600_000;
@@ -580,6 +591,8 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       users: n("SELECT COUNT(*) AS n FROM s_users"), usersToday: n(`SELECT COUNT(*) AS n FROM s_users WHERE created_at > ${day}`),
       posts: n("SELECT COUNT(*) AS n FROM s_posts"), postsToday: n(`SELECT COUNT(*) AS n FROM s_posts WHERE created_at > ${day}`),
       messagesToday: n(`SELECT COUNT(*) AS n FROM s_messages WHERE created_at > ${day}`),
+      ...Object.fromEntries(Object.entries(ext.ownerCounts).map(([k, f]) => [k, f()])),
+      ...Object.fromEntries(Object.entries(ext.ownerPending).map(([k, f]) => ["pending" + k[0].toUpperCase() + k.slice(1), f()])),
       photoMB: Math.round(n("SELECT IFNULL(SUM(bytes),0) AS n FROM s_media") / 1048576),
       freeGB: Math.round(diskFree() / 1024 ** 3), photoApproval: photoApproval(),
       pendingPosts: db.prepare("SELECT p.*, u.username FROM s_posts p JOIN s_users u ON u.id = p.user_id WHERE p.status = 'pending' ORDER BY p.id LIMIT 200").all()
@@ -591,6 +604,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
         if (x.kind === "post") { const p = post(x.target_id); item = p && { username: p.username, text: p.text, photo: p.photo && "/media/" + p.photo, status: p.status }; }
         if (x.kind === "comment") { const c = db.prepare("SELECT c.*, u.username FROM s_comments c JOIN s_users u ON u.id = c.user_id WHERE c.id = ?").get(x.target_id); item = c && { username: c.username, text: c.text, status: c.status }; }
         if (x.kind === "user") { const u = db.prepare("SELECT username, name, bio, status FROM s_users WHERE id = ?").get(x.target_id); item = u && { username: u.username, text: [u.name, u.bio].filter(Boolean).join(" · "), status: u.status }; }
+        if (ext.reportItem[x.kind]) item = ext.reportItem[x.kind](x.target_id);
         if (x.kind === "message") { const m = db.prepare("SELECT m.*, u.username FROM s_messages m JOIN s_users u ON u.id = m.sender_id WHERE m.id = ? AND m.reported = 1").get(x.target_id); item = m && { username: m.username, text: m.text, photo: m.photo && "/media/" + m.photo }; }
         return { kind: x.kind, id: x.target_id, count: x.n, at: x.at, reasons: x.reasons, item };
       }),
@@ -633,7 +647,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       }
       case "user-delete": deleteUser(id, "account closed by owner"); finish("user", id); break;
       case "photo-approval": db.prepare("INSERT INTO s_settings(k, v) VALUES('photoApproval', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(JSON.stringify(!!b.on)); break;
-      default: return bad(res, "Unknown action.");
+      default:
+        if (!ext.ownerActions[act]) return bad(res, "Unknown action.");
+        ext.ownerActions[act](id); finish(act.split("-")[0], id); // groupmsg-delete, group-close, story-ok, ...
     }
     res.json({ ok: true });
   });

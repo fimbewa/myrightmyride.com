@@ -79,6 +79,9 @@
       <div class="stat"><b id="cPosts">0</b>posts</div>
       <div class="stat"><b id="cPostsToday">0</b>posts today</div>
       <div class="stat"><b id="cMsgsToday">0</b>private messages today</div>
+      <div class="stat"><b id="cGroups">0</b>groups</div>
+      <div class="stat"><b id="cGroupMsgsToday">0</b>group messages today</div>
+      <div class="stat"><b id="cStories">0</b>Status updates now</div>
       <div class="stat"><b id="cDisk">0</b>photos MB / free GB</div>
     </div>
     <label style="display:flex;gap:10px;align-items:center;margin:8px 0 14px"><input type="checkbox" id="cPhotoApproval" style="width:auto"> Photos wait for my approval before everyone sees them (recommended while the community is small)</label>
@@ -245,15 +248,17 @@ async function loadCommunity() {
   const q = $("cSearch").value.trim();
   const d = await (await api("/api/admin/community?q=" + encodeURIComponent(q))).json();
   $("cUsers").textContent = d.users; $("cUsersToday").textContent = d.usersToday; $("cPosts").textContent = d.posts; $("cPostsToday").textContent = d.postsToday;
-  $("cMsgsToday").textContent = d.messagesToday; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
+  $("cMsgsToday").textContent = d.messagesToday; $("cGroups").textContent = d.groups || 0; $("cGroupMsgsToday").textContent = d.groupMessagesToday || 0; $("cStories").textContent = d.storiesLive || 0; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
   const pend = $("cPending"); pend.replaceChildren();
   d.pendingPosts.forEach(p => pend.append(cItem("Post · " + when(p.at) + (p.reports ? " · " + p.reports + " report(s)" : ""), p.username, p.text, p.photo,
     [["Approve", { action: "post-ok", id: p.id }], ["Hide", { action: "post-hide", id: p.id }], ["Delete", { action: "post-delete", id: p.id }, true]])));
   d.pendingComments.forEach(c => pend.append(cItem("Comment · " + when(c.at) + (c.reports ? " · " + c.reports + " report(s)" : ""), c.username, c.text, null,
     [["Approve", { action: "comment-ok", id: c.id }], ["Delete", { action: "comment-delete", id: c.id }, true]])));
+  (d.pendingStories || []).forEach(s => pend.append(cItem("Status (disappears 24 hours after it was made) · " + when(s.at) + (s.reports ? " · " + s.reports + " report(s)" : ""), s.username, s.text, s.photo,
+    [["Approve", { action: "story-ok", id: s.id }], ["Delete", { action: "story-delete", id: s.id }, true]])));
   if (!pend.children.length) pend.append(el("p", null, "Nothing waiting."));
   const rep = $("cReports"); rep.replaceChildren();
-  const KINDS = { post: "Post", comment: "Comment", user: "Profile", message: "Private message" };
+  const KINDS = { post: "Post", comment: "Comment", user: "Profile", message: "Private message", groupmsg: "Group message", group: "Group", story: "Status" };
   d.reports.forEach(r => {
     const i = r.item || {}, meta = KINDS[r.kind] + " · reported " + r.count + " time(s) · " + when(r.at) + (r.reasons ? " · " + r.reasons : "") + (i.status ? " · now: " + i.status : "");
     const btns = [];
@@ -261,6 +266,9 @@ async function loadCommunity() {
     if (r.kind === "comment") btns.push(["Keep", { action: "comment-ok", id: r.id }], ["Delete", { action: "comment-delete", id: r.id }, true]);
     if (r.kind === "message") btns.push(["Delete message", { action: "message-delete", id: r.id }, true]);
     if (r.kind === "user") btns.push(["Ban this person", { action: "ban", id: r.id }, true]);
+    if (r.kind === "groupmsg") btns.push(["Delete message", { action: "groupmsg-delete", id: r.id }, true]);
+    if (r.kind === "group") btns.push(i.status === "closed" ? ["Open the group again", { action: "group-open", id: r.id }] : ["Close this group", { action: "group-close", id: r.id }, true]);
+    if (r.kind === "story") btns.push(["Keep", { action: "story-ok", id: r.id }], ["Delete", { action: "story-delete", id: r.id }, true]);
     btns.push(["Close report", { action: "dismiss", kind: r.kind, id: r.id }]);
     rep.append(cItem(meta, i.username, i.text || (r.item ? "" : "(already removed)"), i.photo, btns));
   });
