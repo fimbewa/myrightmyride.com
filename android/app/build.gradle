@@ -1,0 +1,44 @@
+plugins { id 'com.android.application' }
+
+// Signing values come only from GitHub Actions secrets (never from files in this repository).
+def ksPath = System.getenv('QI_KEYSTORE_PATH')
+def ksPass = System.getenv('QI_KEYSTORE_PASSWORD')
+
+// Every Play upload needs a higher versionCode; the workflow passes the run number.
+def vCode = (System.getenv('QI_VERSION_CODE') ?: '1') as Integer
+
+android {
+    namespace 'com.qindiaglobal.app'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.qindiaglobal.app'
+        minSdk 24
+        targetSdk 36
+        versionCode vCode
+        versionName "1.0.${vCode}"
+    }
+    signingConfigs {
+        if (ksPath) {
+            release {
+                storeFile file(ksPath)
+                storePassword ksPass
+                keyAlias System.getenv('QI_KEY_ALIAS') ?: 'upload'
+                keyPassword System.getenv('QI_KEY_PASSWORD') ?: ksPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksPath) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.16.0'
+}
