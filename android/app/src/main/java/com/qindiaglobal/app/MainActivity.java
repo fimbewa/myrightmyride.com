@@ -13,6 +13,10 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
+import android.content.pm.PackageManager;
+import java.util.ArrayList;
+import java.util.List;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -33,6 +37,8 @@ import android.window.OnBackInvokedDispatcher;
 public class MainActivity extends Activity {
     private static final String HOME = "https://qindiaglobal.com/";
     private static final int FILE_REQUEST = 1001;
+    private static final int MEDIA_PERMISSION_REQUEST = 1002;
+    private PermissionRequest pendingWebPermission;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
@@ -50,7 +56,7 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
-        s.setMediaPlaybackRequiresUserGesture(true);
+        s.setMediaPlaybackRequiresUserGesture(false); // Reels autoplay
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
         s.setUserAgentString(s.getUserAgentString() + " QindiaglobalApp/" + BuildConfigHelper.versionName(this));
@@ -205,6 +211,17 @@ public class MainActivity extends Activity {
 
     // ---- Photo / file uploads (community posts, profile photos) ----
     private class Chrome extends WebChromeClient {
+        /** Camera/microphone for calls and voice notes: only for pages of qindiaglobal.com. */
+        @Override
+        public void onPermissionRequest(PermissionRequest request) {
+            runOnUiThread(() -> handleWebPermission(request));
+        }
+
+        @Override
+        public void onPermissionRequestCanceled(PermissionRequest request) {
+            if (pendingWebPermission == request) pendingWebPermission = null;
+        }
+
         @Override
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
             if (fileCallback != null) fileCallback.onReceiveValue(null);
@@ -217,6 +234,43 @@ public class MainActivity extends Activity {
             }
             return true;
         }
+    }
+
+    private void handleWebPermission(PermissionRequest request) {
+        if (!isOurs(request.getOrigin())) { request.deny(); return; }
+        List<String> allowed = new ArrayList<>();
+        List<String> needAndroid = new ArrayList<>();
+        for (String r : request.getResources()) {
+            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) {
+                allowed.add(r);
+                if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+                    needAndroid.add(android.Manifest.permission.CAMERA);
+            } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) {
+                allowed.add(r);
+                if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
+                    needAndroid.add(android.Manifest.permission.RECORD_AUDIO);
+            }
+        }
+        if (allowed.isEmpty()) { request.deny(); return; }
+        if (needAndroid.isEmpty()) { request.grant(allowed.toArray(new String[0])); return; }
+        if (pendingWebPermission != null) pendingWebPermission.deny();
+        pendingWebPermission = request;
+        requestPermissions(needAndroid.toArray(new String[0]), MEDIA_PERMISSION_REQUEST);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != MEDIA_PERMISSION_REQUEST || pendingWebPermission == null) return;
+        PermissionRequest req = pendingWebPermission;
+        pendingWebPermission = null;
+        List<String> grant = new ArrayList<>();
+        for (String r : req.getResources()) {
+            String perm = PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) ? android.Manifest.permission.CAMERA
+                    : PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) ? android.Manifest.permission.RECORD_AUDIO : null;
+            if (perm != null && checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED) grant.add(r);
+        }
+        if (grant.isEmpty()) req.deny(); else req.grant(grant.toArray(new String[0]));
     }
 
     @Override
