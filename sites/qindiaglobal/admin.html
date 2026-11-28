@@ -33,6 +33,7 @@
     <h2>Owner page</h2>
     <p>Enter the owner password.</p>
     <form id="loginForm"><input type="password" name="password" placeholder="Owner password" autocomplete="current-password" required><button class="btn">Log in</button><p class="msg bad" id="loginMsg"></p></form>
+    <form id="tfaForm" hidden><p>Two-step login: type the 6 numbers your authenticator app shows for Qindiaglobal (owner), or a backup code.</p><input name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required><button class="btn">Continue</button><p class="msg bad" id="tfaMsg"></p></form>
     <p style="margin:18px 0 0"><button type="button" class="small-btn" id="resetOpen">Forgot the password? Set a new one</button></p>
   </section>
   <section id="reset" class="card" hidden>
@@ -102,6 +103,9 @@
     <h3>Members</h3>
     <input id="cSearch" placeholder="Search username or name" style="margin-bottom:10px">
     <div style="overflow-x:auto"><table class="tbl" id="cPeople"></table></div>
+    <h3 id="twostep">Two-step login for this owner page</h3>
+    <p class="small-note">Extra safety for /admin: after the password, you also type a 6-digit code from a free authenticator app (for example Google Authenticator from the Play Store). If you lose your phone and backup codes, "Forgot the password? Set a new one" (through GitHub) still lets you in and turns this off.</p>
+    <div id="ownerTfa" class="item"></div>
     <h3 id="mail">Email for password codes (free)</h3>
     <p class="small-note">When this is on, members who forget their password get a 6-digit code by email (they add their email in Community Settings). Easiest: your own Gmail with an "app password". 1) Open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a> and sign in (if Google asks, first turn on 2-Step Verification). 2) Type the name <b>Qindia</b> and tap <b>Create</b>. 3) Copy the 16 letters Google shows, paste them below with your Gmail address, and tap Save. Gmail sends up to about 500 emails a day, free. Codes come from your Gmail address.</p>
     <div id="mailBox" class="item">
@@ -219,6 +223,41 @@ async function load() {
   loadLegal().catch(() => {});
   loadOauth().catch(() => {});
   loadMail().catch(() => {});
+  loadOwnerTfa().catch(() => {});
+}
+// ---------- owner two-step login ----------
+function backupBox(codes) {
+  const b = el("div", "item"); b.append(el("b", null, "Backup codes (each works once if you lose your phone). Save them privately now; they are shown only once:"), el("p", null, codes.join("   ")));
+  b.lastChild.style.cssText = "font-family:monospace;font-size:16px;line-height:1.8"; return b;
+}
+async function loadOwnerTfa() {
+  const d = await (await api("/api/admin/2fa")).json(), box = $("ownerTfa"); box.replaceChildren();
+  const msg = el("p", "msg"), codeIn = ph => { const i = el("input"); i.placeholder = ph; i.inputMode = "numeric"; i.autocomplete = "one-time-code"; return i; };
+  const fail = err => { msg.textContent = err.message; msg.className = "msg bad"; };
+  if (d.on) {
+    box.append(el("b", null, "ON. Backup codes left: " + d.backupsLeft));
+    const c = codeIn("Code from the app (or a backup code to turn off)"), nb = el("button", "small-btn", "Make new backup codes"), off = el("button", "small-btn", "Turn off");
+    nb.onclick = async () => { try { const r = await (await api("/api/admin/2fa/backup", { method: "POST", body: JSON.stringify({ code: c.value }) })).json(); await loadOwnerTfa(); $("ownerTfa").append(backupBox(r.backup)); } catch (e) { fail(e); } };
+    off.onclick = async () => { try { await api("/api/admin/2fa/disable", { method: "POST", body: JSON.stringify({ code: c.value }) }); loadOwnerTfa(); } catch (e) { fail(e); } };
+    box.append(c, nb, document.createTextNode(" "), off, msg);
+  } else {
+    box.append(el("b", null, "Off. Only the password is needed."));
+    const go = el("button", "small-btn", "Turn on two-step login"); go.style.marginTop = "8px";
+    go.onclick = async () => {
+      try {
+        const s = await (await api("/api/admin/2fa/setup", { method: "POST", body: "{}" })).json();
+        box.replaceChildren();
+        const p1 = el("p"), a = el("a", null, "Add to authenticator app"); a.href = s.uri;
+        p1.append("1. On this phone tap ", a, ". On a computer, scan this picture with the app:");
+        const img = el("img"); img.src = s.qr; img.alt = "QR code"; img.style.cssText = "width:180px;height:180px;display:block;margin:6px 0";
+        const key = el("p", "meta", "Or in the app choose \"Enter a setup key\" and type: " + s.secret.replace(/(.{4})/g, "$1 ").trim());
+        const c = codeIn("2. Type the 6 numbers the app shows"), ok = el("button", "small-btn", "Check code and turn on");
+        ok.onclick = async () => { try { const r = await (await api("/api/admin/2fa/enable", { method: "POST", body: JSON.stringify({ code: c.value }) })).json(); await loadOwnerTfa(); $("ownerTfa").append(backupBox(r.backup)); } catch (e) { fail(e); } };
+        box.append(p1, img, key, c, ok, msg);
+      } catch (e) { fail(e); }
+    };
+    box.append(el("br"), go, msg);
+  }
 }
 // ---------- email for password codes ----------
 async function loadMail() {
@@ -362,11 +401,26 @@ async function loadCommunity() {
 let cT = null;
 $("cSearch").oninput = () => { clearTimeout(cT); cT = setTimeout(() => loadCommunity().catch(() => {}), 300); };
 $("cPhotoApproval").onchange = e => cAct({ action: "photo-approval", on: e.target.checked });
+let tfaTicket = "";
+$("tfaForm").onsubmit = async e => {
+  e.preventDefault(); $("tfaMsg").textContent = "";
+  const res = await fetch("/api/admin/login/2fa", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticket: tfaTicket, code: e.target.code.value }) }).catch(() => null);
+  const d = res && await res.json().catch(() => null);
+  if (!res || !res.ok || !d) {
+    $("tfaMsg").textContent = (d && d.error) || "The server is not reachable yet.";
+    if (res && res.status === 410 || /log in again/.test((d && d.error) || "")) { e.target.reset(); e.target.hidden = true; $("loginForm").hidden = false; $("loginMsg").textContent = d.error; }
+    return;
+  }
+  tok = d.token; try { sessionStorage.setItem("qi_owner", tok); } catch {}
+  e.target.reset(); e.target.hidden = true; $("loginForm").hidden = false; $("loginForm").reset();
+  load().catch(err => { $("loginMsg").textContent = err.message; });
+};
 $("loginForm").onsubmit = async e => {
   e.preventDefault(); $("loginMsg").textContent = "";
   const res = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: e.target.password.value }) }).catch(() => null);
   const d = res && await res.json().catch(() => null);
   if (!res || !res.ok || !d) { $("loginMsg").textContent = (d && d.error) || "The server is not reachable yet."; return; }
+  if (d.need2fa) { tfaTicket = d.ticket; e.target.hidden = true; $("tfaForm").hidden = false; $("tfaForm").code.focus(); return; }
   tok = d.token; try { sessionStorage.setItem("qi_owner", tok); } catch {}
   e.target.reset(); load().catch(err => { $("loginMsg").textContent = err.message; });
 };
