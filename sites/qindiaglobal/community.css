@@ -162,3 +162,13 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .voice .rec{color:var(--bad);font-variant-numeric:tabular-nums;min-width:52px}
 .voice:has(.rec) ~ textarea{display:none}
 .bubble audio{display:block;width:240px;max-width:100%;height:40px;margin-bottom:2px}
+/* Pages and shares */
+.prof.pg{padding-top:0;overflow:hidden}
+.prof.pg .cover{display:block;width:calc(100% + 28px);margin:0 -14px;height:150px;object-fit:cover;background:linear-gradient(135deg,var(--deep),var(--accent))}
+.prof.pg .av.big{margin-top:-42px;border:4px solid #fff}
+.shared{display:block;margin:0 14px 10px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-decoration:none;color:var(--ink);overflow:hidden}
+.shared .tx{padding:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.shared img,.shared video{display:block;width:calc(100% + 24px);margin:8px -12px -10px;max-height:320px;object-fit:cover;background:#000}
+.post .acts{position:relative}
+.share-menu{bottom:100%;top:auto;right:auto;left:50%;transform:translateX(-50%);min-width:260px}
+.cm .tabs a{font-size:15px}

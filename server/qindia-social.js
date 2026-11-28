@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   db.exec(`CREATE TABLE IF NOT EXISTS s_identities (
   provider TEXT NOT NULL, subject TEXT NOT NULL, user_id INTEGER NOT NULL REFERENCES s_users(id) ON DELETE CASCADE,
   created_at INTEGER NOT NULL, PRIMARY KEY (provider, subject))`);
+  // Added later: posts made as a Page (page_id) and shares of another post (share_of).
+  for (const col of ["page_id", "share_of"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col)) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col} INTEGER`);
+  db.exec("CREATE INDEX IF NOT EXISTS s_posts_page ON s_posts(page_id, id)");
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
   fs.mkdirSync(MEDIA, { recursive: true });
   // IT Intermediary Rules 2021, rule 3(1)(g)/(h): what the owner removes, and the sign-up details of closed
@@ -321,30 +324,52 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   });
 
   // ---------- posts ----------
-  const postOut = (p, meId) => ({
-    id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
-    likes: p.likes, comments: p.comments, created_at: p.created_at,
-    liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
-    mine: meId === p.user_id,
-    user: { username: p.username, name: p.name, avatar: avatarUrl(p.avatar) },
-  });
-  const POST_SQL = "SELECT p.*, u.username, u.name, u.avatar FROM s_posts p JOIN s_users u ON u.id = p.user_id";
+  const postOut = (p, meId, inner = false) => {
+    const out = {
+      id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
+      likes: p.likes, comments: p.comments, created_at: p.created_at,
+      liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
+      mine: meId === p.user_id,
+      // A post made as a Page shows the Page (like Facebook), not the person who wrote it.
+      user: p.page_id ? { username: p.pg_handle, name: p.pg_name, avatar: avatarUrl(p.pg_avatar), page: true } : { username: p.username, name: p.name, avatar: avatarUrl(p.avatar) },
+    };
+    // A share shows the original post inside it (or a note when the original is gone).
+    if (p.share_of && !inner) {
+      const o = db.prepare(`${POST_SQL} WHERE p.id = ? AND ${visible(0)}${notBlocked(meId)}`).get(p.share_of);
+      out.shared = o ? postOut(o, meId, true) : { gone: true };
+    }
+    return out;
+  };
+  const POST_SQL = "SELECT p.*, u.username, u.name, u.avatar, pg.handle AS pg_handle, pg.name AS pg_name, pg.avatar AS pg_avatar FROM s_posts p JOIN s_users u ON u.id = p.user_id LEFT JOIN s_pages pg ON pg.id = p.page_id";
   // A post is visible to everyone when it is "ok"; its author also sees it while it waits for the owner.
-  const visible = meId => `(p.status = 'ok' OR (p.user_id = ${Number(meId) || 0} AND p.status = 'pending')) AND u.status = 'ok'`;
+  // Posts of a Page that the site owner closed are not shown.
+  const visible = meId => `(p.status = 'ok' OR (p.user_id = ${Number(meId) || 0} AND p.status = 'pending')) AND u.status = 'ok' AND (p.page_id IS NULL OR pg.status = 'ok')`;
   const notBlocked = meId => (meId ? ` AND p.user_id NOT IN (SELECT blocked_id FROM s_blocks WHERE blocker_id = ${Number(meId)}) AND p.user_id NOT IN (SELECT blocker_id FROM s_blocks WHERE blocked_id = ${Number(meId)})` : "");
   const before = req => { const n = Number(req.query.before); return Number.isFinite(n) && n > 0 ? n : 2 ** 53; };
 
   r.post("/api/s/posts", login, (req, res) => {
     const b = req.body || {}, me = req.me;
     const text = para(b.text, TEXT_MAX);
-    if (!text && !b.photo && !b.video) return bad(res, "Write something or add a photo or video.");
+    // Share another post (with optional words of my own). Sharing a share shares the original.
+    let shareOf = null;
+    if (b.share) {
+      const o = db.prepare(`${POST_SQL} WHERE p.id = ? AND p.status = 'ok' AND u.status = 'ok' AND (p.page_id IS NULL OR pg.status = 'ok')`).get(Number(b.share));
+      if (!o || blockedEither(o.user_id, me.id)) return bad(res, "This post cannot be shared.", 404);
+      shareOf = o.share_of || o.id;
+      if (b.photo || b.video) return bad(res, "A share cannot have its own photo or video.");
+    }
+    // Post as a Page I manage.
+    let pageId = null;
+    if (b.page) { pageId = ext.myPage(me.id, b.page); if (!pageId) return bad(res, "You can post only on your own Page.", 403); }
+    if (!text && !b.photo && !b.video && !shareOf) return bad(res, "Write something or add a photo or video.");
     if (isBad(text, false)) return bad(res, "Please remove rude, sexual or abusive words. Qindia is a family place.");
     if (limited(req, "post:" + me.id, 30, 3600_000)) return bad(res, "You have posted a lot in the last hour. Please wait a little.", 429);
     let photo = null; // the photo or the video (s_posts.photo holds either; the file name says which)
     if (b.video) { photo = takeMedia(b.video, me.id, "video"); if (!photo) return bad(res, "The video was not found. Please choose it again."); }
     else if (b.photo) { photo = takeMedia(b.photo, me.id); if (!photo) return bad(res, "The photo was not found. Please choose it again."); }
     const status = isDoubtful(text) || me.reports >= 3 || (photo && photoApproval()) ? "pending" : "ok";
-    const id = db.prepare("INSERT INTO s_posts(user_id, text, photo, status, created_at) VALUES(?,?,?,?,?)").run(me.id, text || null, photo, status, now()).lastInsertRowid;
+    const id = db.prepare("INSERT INTO s_posts(user_id, text, photo, status, created_at, page_id, share_of) VALUES(?,?,?,?,?,?,?)").run(me.id, text || null, photo, status, now(), pageId, shareOf).lastInsertRowid;
+    if (shareOf && status === "ok") { const o = db.prepare("SELECT user_id FROM s_posts WHERE id = ?").get(shareOf); if (o) notify(o.user_id, "share", me.id, id); }
     res.json({ post: postOut(db.prepare(POST_SQL + " WHERE p.id = ?").get(id), me.id) });
   });
 
@@ -352,7 +377,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   r.get("/api/s/feed", optional, (req, res) => {
     const meId = req.me && req.me.status === "ok" ? req.me.id : 0;
     const tab = meId && req.query.tab === "following" ? "following" : "all";
-    const who = tab === "following" ? ` AND (p.user_id = ${meId} OR p.user_id IN (SELECT followee_id FROM s_follows WHERE follower_id = ${meId}))` : "";
+    const who = tab === "following" ? ` AND (p.user_id = ${meId} OR (p.page_id IS NULL AND p.user_id IN (SELECT followee_id FROM s_follows WHERE follower_id = ${meId})) OR p.page_id IN (SELECT page_id FROM s_page_follows WHERE user_id = ${meId}))` : "";
     const rows = db.prepare(`${POST_SQL} WHERE ${visible(meId)}${notBlocked(meId)}${who} AND p.id < ? ORDER BY p.id DESC LIMIT ${PAGE}`).all(before(req));
     res.json({ posts: rows.map(p => postOut(p, meId)), more: rows.length === PAGE });
   });
@@ -427,11 +452,11 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const u = db.prepare("SELECT * FROM s_users WHERE username = ? AND status = 'ok'").get(String(req.params.username).toLowerCase());
     const meId = req.me ? req.me.id : 0;
     if (!u || (meId && blockedEither(u.id, meId) && !db.prepare("SELECT 1 FROM s_blocks WHERE blocker_id = ? AND blocked_id = ?").get(meId, u.id))) return bad(res, "This person was not found.", 404);
-    const posts = db.prepare(`${POST_SQL} WHERE p.user_id = ? AND ${visible(meId)} AND p.id < ? ORDER BY p.id DESC LIMIT ${PAGE}`).all(u.id, before(req));
+    const posts = db.prepare(`${POST_SQL} WHERE p.user_id = ? AND p.page_id IS NULL AND ${visible(meId)} AND p.id < ? ORDER BY p.id DESC LIMIT ${PAGE}`).all(u.id, before(req));
     res.json({
       user: {
         ...pubUser(u), bio: u.bio || "", city: u.city || "", joined: u.created_at,
-        posts: db.prepare("SELECT COUNT(*) AS n FROM s_posts WHERE user_id = ? AND status = 'ok'").get(u.id).n,
+        posts: db.prepare("SELECT COUNT(*) AS n FROM s_posts WHERE user_id = ? AND page_id IS NULL AND status = 'ok'").get(u.id).n,
         followers: db.prepare("SELECT COUNT(*) AS n FROM s_follows WHERE followee_id = ?").get(u.id).n,
         following: db.prepare("SELECT COUNT(*) AS n FROM s_follows WHERE follower_id = ?").get(u.id).n,
         me: meId === u.id, iFollow: meId ? follows(meId, u.id) : false, followsMe: meId ? follows(u.id, meId) : false,
@@ -618,6 +643,8 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
   require("./qindia-groups")(ext);
   require("./qindia-stories")(ext);
+  Object.assign(ext, { POST_SQL, visible, notBlocked, postOut, before, PAGE });
+  require("./qindia-pages")(ext);
 
   // ---------- owner: community moderation on /admin ----------
   r.get("/api/admin/community", owner, (req, res) => {
