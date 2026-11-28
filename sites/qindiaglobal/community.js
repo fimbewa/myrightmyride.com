@@ -199,7 +199,7 @@
     const m = msgBox();
     const f = h("form", { cls: "card" },
       h("h1", { text: "Log in" }), socialButtons(),
-      h("div", {}, h("label", { for: "lu", text: "Username" }), h("input", { id: "lu", name: "username", autocomplete: "username", autocapitalize: "none", required: true })),
+      h("div", {}, h("label", { for: "lu", text: "Username or email" }), h("input", { id: "lu", name: "username", autocomplete: "username", autocapitalize: "none", required: true })),
       h("div", {}, h("label", { for: "lp", text: "Password" }), h("input", { id: "lp", name: "password", type: "password", autocomplete: "current-password", required: true })),
       h("button", { cls: "btn" }, "Log in"), m,
       h("p", { cls: "muted" }, "New here? ", h("a", { href: "#/signup" }, "Create a free account"), " · ", h("a", { href: "#/recover" }, "Forgot password?")));
@@ -237,22 +237,50 @@
     };
     show(f);
   }
-  function recoverPage() {
+  // Forgotten password: a 6-digit code by email (when the member saved an email and the owner switched email on),
+  // or the recovery code from sign-up. The username or the saved email both work.
+  async function recoverPage() {
+    const info = await api("/api/s/reset/info").catch(() => ({}));
+    const done = d => { setToken(d.token); loadMe().then(() => showRecovery(d.recovery, () => go("#/"))); };
+    const who = h("input", { name: "who", placeholder: "Username or email", autocomplete: "username", autocapitalize: "none", required: true });
+    const tip = h("p", { cls: "muted", style: "font-size:13px;margin:4px 0 0", text: "Your username is on your profile, after the @ sign (for example @ravi_patil)." });
+    // 1. code by email
+    const em = msgBox(), step2 = h("div", { hidden: true });
+    const send = h("button", { cls: "btn", type: "button" }, "Email me a code");
+    const code = h("input", { name: "code", placeholder: "6-digit code from the email", inputmode: "numeric", autocomplete: "one-time-code", maxlength: 7 });
+    const pw1 = h("input", { name: "password", type: "password", placeholder: "New password (at least 8 characters)", minlength: 8, autocomplete: "new-password" });
+    const set1 = h("button", { cls: "btn", type: "button" }, "Set new password");
+    step2.append(code, pw1, set1);
+    send.onclick = async () => {
+      if (!who.value.trim()) return say(em, "Please type your username or email.");
+      send.disabled = true; say(em, "Sending…", true);
+      try { const d = await api("/api/s/reset/start", { body: { username: who.value }, noLogout: true }); say(em, "We sent a 6-digit code to " + d.to + " for @" + d.username + ". It works for 10 minutes. Not in your inbox? Look in Spam.", true); step2.hidden = false; send.textContent = "Send the code again"; code.focus(); }
+      catch (err) { say(em, err.message); }
+      setTimeout(() => { send.disabled = false; }, 2000);
+    };
+    set1.onclick = async () => {
+      say(em, "Please wait…", true);
+      try { done(await api("/api/s/reset/finish", { body: { username: who.value, code: code.value, password: pw1.value }, noLogout: true })); }
+      catch (err) { say(em, err.message); }
+    };
+    // 2. recovery code
     const m = msgBox();
-    const f = h("form", { cls: "card" },
-      h("h1", { text: "Forgot your password?" }),
-      h("p", { cls: "muted", text: "Use the recovery code you saved when you made your account." }),
-      h("input", { name: "username", placeholder: "Username", autocapitalize: "none", required: true }),
-      h("input", { name: "code", placeholder: "Recovery code, like ABCD-EFGH-JKLM-NPQR", autocapitalize: "characters", required: true }),
+    const f = h("form", {},
+      h("input", { name: "code", placeholder: "Recovery code, like ABCD-EFGH-JKLM-NPQR", autocapitalize: "characters", autocomplete: "off", required: true }),
       h("input", { name: "password", type: "password", placeholder: "New password (at least 8 characters)", minlength: 8, autocomplete: "new-password", required: true }),
-      h("button", { cls: "btn" }, "Set new password"), m,
-      h("p", { cls: "muted", text: "Lost the code too? Write to the site owner using the form on the home page, from the city and name on your profile." }));
+      h("button", { cls: info.email ? "sbtn dark" : "btn" }, "Set new password"), m);
     f.onsubmit = async e => {
-      e.preventDefault(); say(m, "Please wait…", true);
-      try { const d = await api("/api/s/recover", { body: { username: f.username.value, code: f.code.value, password: f.password.value }, noLogout: true }); setToken(d.token); await loadMe(); showRecovery(d.recovery, () => go("#/")); }
+      e.preventDefault(); if (!who.value.trim()) return say(m, "Please type your username or email above.");
+      say(m, "Please wait…", true);
+      try { done(await api("/api/s/recover", { body: { username: who.value, code: f.code.value, password: f.password.value }, noLogout: true })); }
       catch (err) { say(m, err.message); }
     };
-    show(f);
+    show(h("div", { cls: "card" },
+      h("h1", { text: "Forgot your password?" }),
+      h("div", {}, h("label", { text: "Your username or email" }), who, tip),
+      info.email && h("div", {}, h("h3", { text: "Get a code by email" }), h("p", { cls: "muted", text: "Works if you saved your email in Settings." }), send, em, step2),
+      h("div", {}, h("h3", { text: info.email ? "Or use your recovery code" : "Use your recovery code" }), h("p", { cls: "muted", text: "The code you saved when you made your account. Capital or small letters and spaces do not matter." }), f),
+      h("p", { cls: "muted", text: "Lost both? Write to the site owner using the form on the home page, with your username, name and city." })));
   }
 
   // ---------- posts ----------
@@ -530,6 +558,29 @@
       me.hasPassword && h("input", { name: "old", type: "password", placeholder: "Current password", autocomplete: "current-password", required: true }),
       h("input", { name: "password", type: "password", placeholder: "New password (at least 8 characters)", minlength: 8, autocomplete: "new-password", required: true }), h("button", { cls: "sbtn dark" }, "Change password"), pm);
     pf.onsubmit = async e => { e.preventDefault(); try { await api("/api/s/password", { body: { old: pf.old ? pf.old.value : "", password: pf.password.value } }); await loadMe(); pf.reset(); say(pm, "Password changed. Other phones were logged out.", true); } catch (err) { say(pm, err.message); } };
+    // Email for password codes (checked with a code first)
+    const emMsg = msgBox(), emBox = h("div", {});
+    const drawEmail = () => {
+      emBox.replaceChildren();
+      if (me.email) {
+        const rm = h("button", { cls: "sbtn", type: "button" }, "Remove");
+        rm.onclick = async () => { try { await api("/api/s/email/remove", { body: {} }); await loadMe(); drawEmail(); say(emMsg, "Email removed.", true); } catch (e) { say(emMsg, e.message); } };
+        emBox.append(h("p", { cls: "row" }, h("b", { cls: "grow", text: me.email }), rm), h("p", { cls: "muted", text: "If you forget your password, we can send a code to this email. To change it, type a new one below." }));
+      } else emBox.append(h("p", { cls: "muted", text: me.emailOn ? "Add your email so that, if you forget your password, we can send you a code. It is never shown to anyone." : "Password codes by email will be switched on soon. Until then, keep your recovery code safe." }));
+      if (!me.emailOn) return;
+      const ef = h("form", {}, h("input", { name: "email", type: "email", placeholder: "Your email", autocomplete: "email", required: true }), h("button", { cls: "sbtn dark" }, "Send me a code"));
+      const cf = h("form", { hidden: true }, h("input", { name: "code", placeholder: "6-digit code from the email", inputmode: "numeric", autocomplete: "one-time-code", maxlength: 7, required: true }), h("button", { cls: "sbtn dark" }, "Save email"));
+      ef.onsubmit = async e => { e.preventDefault(); say(emMsg, "Sending…", true); try { const d = await api("/api/s/email/start", { body: { email: ef.email.value } }); say(emMsg, "We sent a code to " + d.to + ". Type it here (look in Spam too).", true); cf.hidden = false; cf.code.focus(); } catch (err) { say(emMsg, err.message); } };
+      cf.onsubmit = async e => { e.preventDefault(); try { await api("/api/s/email/confirm", { body: { code: cf.code.value } }); await loadMe(); drawEmail(); say(emMsg, "Email saved.", true); } catch (err) { say(emMsg, err.message); } };
+      emBox.append(ef, cf);
+    };
+    drawEmail();
+    // New recovery code (the old one stops working)
+    const rcMsg = msgBox();
+    const rf = h("form", {}, h("p", { cls: "muted", text: "Make a new recovery code if someone may have seen yours. The old code stops working at once." }),
+      me.hasPassword && h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true }),
+      h("button", { cls: "sbtn dark" }, "Make a new recovery code"), rcMsg);
+    rf.onsubmit = async e => { e.preventDefault(); try { const d = await api("/api/s/recovery/new", { body: { password: rf.password ? rf.password.value : "" } }); showRecovery(d.recovery, () => go("#/me/settings")); } catch (err) { say(rcMsg, err.message); } };
     const dmsg = msgBox();
     const df = h("form", {}, h("p", { cls: "muted", text: "This removes your profile, posts, comments, likes, photos and the messages you sent. It cannot be undone." }),
       me.hasPassword ? h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true })
@@ -549,6 +600,8 @@
     show(h("h1", { text: "Settings" }), inv,
       h("div", { cls: "card" }, h("label", { text: "Who can message me" }), dm, dmMsg),
       h("div", { cls: "card" }, h("label", { text: "Password" }), pf),
+      h("div", { cls: "card" }, h("label", { text: "Email for password codes" }), emBox, emMsg),
+      h("div", { cls: "card" }, h("label", { text: "Recovery code" }), rf),
       (me.linked || []).length > 0 && h("div", { cls: "card" }, h("label", { text: "Signed in with" }), ...(me.linked || []).map(p => {
         const b = h("button", { cls: "sbtn" }, "Remove");
         b.onclick = async () => { try { await api("/api/s/oauth/unlink", { body: { provider: p } }); settingsPage(); } catch (e) { alertNote(e.message); } };

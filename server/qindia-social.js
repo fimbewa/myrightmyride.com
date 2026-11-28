@@ -98,6 +98,13 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   db.exec("CREATE TABLE IF NOT EXISTS s_views (post_id INTEGER NOT NULL REFERENCES s_posts(id) ON DELETE CASCADE, viewer TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (post_id, viewer))");
   for (const col of ["page_id", "share_of"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col)) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col} INTEGER`);
   db.exec("CREATE INDEX IF NOT EXISTS s_posts_page ON s_posts(page_id, id)");
+  // Added later: an optional email (checked with a code) for resetting a forgotten password by email.
+  if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "email")) db.exec("ALTER TABLE s_users ADD COLUMN email TEXT");
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS s_users_email ON s_users(email) WHERE email IS NOT NULL;
+CREATE TABLE IF NOT EXISTS s_codes (
+  user_id INTEGER NOT NULL REFERENCES s_users(id) ON DELETE CASCADE, purpose TEXT NOT NULL, -- reset | verify
+  email TEXT NOT NULL, salt TEXT NOT NULL, code_hash TEXT NOT NULL, tries INTEGER NOT NULL DEFAULT 0,
+  expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (user_id, purpose))`);
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
   fs.mkdirSync(MEDIA, { recursive: true });
   // IT Intermediary Rules 2021, rule 3(1)(g)/(h): what the owner removes, and the sign-up details of closed
@@ -180,24 +187,177 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   r.post("/api/s/login", (req, res) => {
     const b = req.body || {};
     if (limited(req, "slogin", 20, 15 * 60_000)) return bad(res, "Too many tries. Please wait 15 minutes.", 429);
-    const u = db.prepare("SELECT * FROM s_users WHERE username = ?").get(String(b.username || "").trim().toLowerCase().replace(/^@/, ""));
+    const u = findAccount(b.username).user;
     if (!u || !same(scrypt(String(b.password || ""), u.pass_salt), u.pass_hash)) return bad(res, "Wrong username or password.", 401);
     if (u.status === "banned") return bad(res, "This account has been stopped by the site owner for breaking the rules.", 403);
     res.json({ token: newSession(u.id), user: { username: u.username, name: u.name } });
   });
 
-  // Forgotten password: username + the recovery code given at sign-up. A new recovery code is given each time.
+  // Find an account by username (with or without @) or by its saved email. Spaces and capitals do not matter.
+  const EMAIL_RX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  const normEmail = e => String(e || "").trim().toLowerCase();
+  function findAccount(input) {
+    const v = String(input || "").trim().toLowerCase();
+    if (EMAIL_RX.test(v)) return { byEmail: true, value: v, user: db.prepare("SELECT * FROM s_users WHERE email = ?").get(v) };
+    const name = v.replace(/^@/, "").replace(/\s+/g, "");
+    return { byEmail: false, value: name, user: db.prepare("SELECT * FROM s_users WHERE username = ?").get(name) };
+  }
+  const notFound = (res, f) => bad(res, f.byEmail
+    ? "No account has this email saved. Please type your username instead (it is on your profile, after the @ sign)."
+    : `No account has the username "${f.value.slice(0, 40)}". Please check the spelling (your username is on your profile, after the @ sign).`, 404);
+  // A new password: also gives a new recovery code and logs out every phone.
+  function setNewPassword(u, pw) {
+    const salt = crypto.randomBytes(16).toString("hex"), rsalt = crypto.randomBytes(16).toString("hex"), rec = recoveryCode();
+    db.prepare("UPDATE s_users SET pass_salt = ?, pass_hash = ?, pass_set = 1, rec_salt = ?, rec_hash = ? WHERE id = ?").run(salt, scrypt(pw, salt), rsalt, scrypt(normRec(rec), rsalt), u.id);
+    db.prepare("DELETE FROM s_sessions WHERE user_id = ?").run(u.id);
+    db.prepare("DELETE FROM s_codes WHERE user_id = ? AND purpose = 'reset'").run(u.id);
+    return rec;
+  }
+
+  // Forgotten password: username (or saved email) + the recovery code given at sign-up. A new recovery code is given each time.
   r.post("/api/s/recover", (req, res) => {
     const b = req.body || {};
     if (limited(req, "recover", 10, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
-    const u = db.prepare("SELECT * FROM s_users WHERE username = ?").get(String(b.username || "").trim().toLowerCase().replace(/^@/, ""));
-    if (!u || !same(scrypt(normRec(b.code), u.rec_salt), u.rec_hash)) return bad(res, "Wrong username or recovery code.", 401);
+    const f = findAccount(b.username), u = f.user;
+    if (!u) return notFound(res, f);
+    if (!normRec(b.code)) return bad(res, "Please type your recovery code.");
+    if (!same(scrypt(normRec(b.code), u.rec_salt), u.rec_hash)) return bad(res, `This recovery code does not match @${u.username}. Please check it letter by letter${mailReady(mailCfg()) && u.email ? ", or get a code by email instead" : ""}.`, 401);
     if (String(b.password || "").length < 8) return bad(res, "The new password must be at least 8 characters.");
     if (u.status === "banned") return bad(res, "This account has been stopped by the site owner.", 403);
-    const salt = crypto.randomBytes(16).toString("hex"), rsalt = crypto.randomBytes(16).toString("hex"), rec = recoveryCode();
-    db.prepare("UPDATE s_users SET pass_salt = ?, pass_hash = ?, rec_salt = ?, rec_hash = ? WHERE id = ?").run(salt, scrypt(b.password, salt), rsalt, scrypt(normRec(rec), rsalt), u.id);
-    db.prepare("DELETE FROM s_sessions WHERE user_id = ?").run(u.id);
+    const rec = setNewPassword(u, String(b.password));
     res.json({ token: newSession(u.id), recovery: rec, user: { username: u.username, name: u.name } });
+  });
+
+  // ---------- email codes (password reset by email, and checking a new email) ----------
+  const { sendMail, mailReady } = require("./mailer");
+  const mailCfg = () => setting("mail", null);
+  const CODE_MS = 10 * 60_000, CODE_TRIES = 5;
+  const mask = e => { const [a, d] = String(e).split("@"); return a.slice(0, Math.min(2, a.length - 1)) + "***@" + d; };
+  const sent = new Map(); // "user id:purpose" -> times of codes sent (at most 1 a minute and 5 a day for each account)
+  function tooMany(userId, purpose) {
+    const k = userId + ":" + purpose, t = now(), list = (sent.get(k) || []).filter(x => t - x < 24 * 3600_000);
+    sent.set(k, list);
+    if (list.length && t - list[list.length - 1] < 60_000) return "Please wait one minute before asking for another code.";
+    if (list.length >= 5) return "Too many codes for this account today. Please try again tomorrow.";
+    list.push(t); return null;
+  }
+  async function sendCode(u, purpose, email) {
+    db.prepare("DELETE FROM s_codes WHERE expires_at < ?").run(now()); // old codes are not kept
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0"), salt = crypto.randomBytes(16).toString("hex");
+    db.prepare("INSERT OR REPLACE INTO s_codes(user_id, purpose, email, salt, code_hash, tries, expires_at, created_at) VALUES(?,?,?,?,?,0,?,?)")
+      .run(u.id, purpose, email, salt, sha(salt + code), now() + CODE_MS, now());
+    const what = purpose === "reset" ? "set a new password for" : "save this email on";
+    await sendMail(mailCfg(), {
+      to: email, subject: `Your Qindiaglobal code: ${code}`,
+      text: `Namaste ${u.name},\n\nYour code is: ${code}\n\nType it on qindiaglobal.com to ${what} your Q India Community account @${u.username}. It works for 10 minutes.\n\nIf you did not ask for this, ignore this email. Nothing changes and nobody can use the code without your email.\n\nQindiaglobal (a citizens' initiative, not connected with any government)`,
+    }).catch(e => { db.prepare("DELETE FROM s_codes WHERE user_id = ? AND purpose = ?").run(u.id, purpose); console.log("[email] " + e.message); throw new Error("The email could not be sent just now. Please try again later, or use your recovery code."); });
+  }
+  // Checks a typed code. Returns the stored row when right, or an error text.
+  function checkCode(u, purpose, typed) {
+    const row = db.prepare("SELECT * FROM s_codes WHERE user_id = ? AND purpose = ?").get(u.id, purpose);
+    if (!row || row.expires_at < now() || row.tries >= CODE_TRIES) return { error: "This code has expired. Please ask for a new code." };
+    const c = String(typed || "").replace(/\D/g, "");
+    if (c.length !== 6 || !same(sha(row.salt + c), row.code_hash)) {
+      db.prepare("UPDATE s_codes SET tries = tries + 1 WHERE user_id = ? AND purpose = ?").run(u.id, purpose);
+      const left = CODE_TRIES - row.tries - 1;
+      return { error: left > 0 ? `Wrong code. Please check the 6 numbers in the email (${left} ${left === 1 ? "try" : "tries"} left).` : "Wrong code too many times. Please ask for a new code." };
+    }
+    return { row };
+  }
+
+  r.get("/api/s/reset/info", (req, res) => res.json({ email: mailReady(mailCfg()) }));
+  r.post("/api/s/reset/start", async (req, res) => {
+    const b = req.body || {};
+    if (!mailReady(mailCfg())) return bad(res, "Codes by email are not switched on yet. Please use your recovery code.", 503);
+    if (limited(req, "reset-start", 8, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
+    const f = findAccount(b.username), u = f.user;
+    if (!u) return notFound(res, f);
+    if (u.status === "banned") return bad(res, "This account has been stopped by the site owner.", 403);
+    if (!u.email) return bad(res, `@${u.username} has no email saved, so we cannot send a code. Please use your recovery code. After you log in, add your email in Settings so that this works next time.`, 409);
+    const wait = tooMany(u.id, "reset"); if (wait) return bad(res, wait, 429);
+    try { await sendCode(u, "reset", u.email); } catch (e) { return bad(res, e.message, 502); }
+    res.json({ ok: true, to: mask(u.email), username: u.username });
+  });
+  r.post("/api/s/reset/finish", (req, res) => {
+    const b = req.body || {};
+    if (limited(req, "reset-finish", 20, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
+    const f = findAccount(b.username), u = f.user;
+    if (!u) return notFound(res, f);
+    const c = checkCode(u, "reset", b.code); if (c.error) return bad(res, c.error, 401);
+    if (String(b.password || "").length < 8) return bad(res, "The new password must be at least 8 characters.");
+    if (u.status === "banned") return bad(res, "This account has been stopped by the site owner.", 403);
+    const rec = setNewPassword(u, String(b.password));
+    res.json({ token: newSession(u.id), recovery: rec, user: { username: u.username, name: u.name } });
+  });
+
+  // A logged-in member adds (or changes) their email: we send a code to it first, so only a working email of theirs is saved.
+  r.post("/api/s/email/start", login, async (req, res) => {
+    const me = req.me, email = normEmail(req.body && req.body.email);
+    if (!mailReady(mailCfg())) return bad(res, "Email is not switched on yet by the site owner. Please try again later.", 503);
+    if (!EMAIL_RX.test(email) || email.length > 120) return bad(res, "Please check the email address.");
+    if (db.prepare("SELECT 1 FROM s_users WHERE email = ? AND id != ?").get(email, me.id)) return bad(res, "This email is already saved on another account.", 409);
+    if (limited(req, "email-start", 10, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
+    const wait = tooMany(me.id, "verify"); if (wait) return bad(res, wait, 429);
+    try { await sendCode(me, "verify", email); } catch (e) { return bad(res, e.message, 502); }
+    res.json({ ok: true, to: email });
+  });
+  r.post("/api/s/email/confirm", login, (req, res) => {
+    const me = req.me, c = checkCode(me, "verify", req.body && req.body.code);
+    if (c.error) return bad(res, c.error, 401);
+    if (db.prepare("SELECT 1 FROM s_users WHERE email = ? AND id != ?").get(c.row.email, me.id)) return bad(res, "This email is already saved on another account.", 409);
+    db.prepare("UPDATE s_users SET email = ? WHERE id = ?").run(c.row.email, me.id);
+    db.prepare("DELETE FROM s_codes WHERE user_id = ? AND purpose = 'verify'").run(me.id);
+    res.json({ ok: true, email: c.row.email });
+  });
+  r.post("/api/s/email/remove", login, (req, res) => { db.prepare("UPDATE s_users SET email = NULL WHERE id = ?").run(req.me.id); res.json({ ok: true }); });
+  // A fresh recovery code (the old one stops working), for example when the old one was seen by someone else.
+  r.post("/api/s/recovery/new", login, (req, res) => {
+    const me = req.me, b = req.body || {};
+    if (me.pass_set && !same(scrypt(String(b.password || ""), me.pass_salt), me.pass_hash)) return bad(res, "The password is wrong.", 401);
+    const rsalt = crypto.randomBytes(16).toString("hex"), rec = recoveryCode();
+    db.prepare("UPDATE s_users SET rec_salt = ?, rec_hash = ? WHERE id = ?").run(rsalt, scrypt(normRec(rec), rsalt), me.id);
+    res.json({ recovery: rec });
+  });
+
+  // Owner: email settings for the codes (free Gmail app password or free Brevo key).
+  r.get("/api/admin/mail", owner, (req, res) => {
+    const c = mailCfg() || {};
+    res.json({ on: mailReady(c), kind: c.kind || "", user: c.user || "", from: c.from || "", name: c.name || "", saved: !!(c.pass || c.key),
+      members: db.prepare("SELECT COUNT(*) AS n FROM s_users WHERE email IS NOT NULL").get().n });
+  });
+  r.post("/api/admin/mail", owner, (req, res) => {
+    const b = req.body || {}, old = mailCfg() || {}, kind = String(b.kind || "");
+    let cfg = null;
+    if (kind === "gmail") {
+      const user = normEmail(b.user), pass = String(b.pass || "").replace(/\s+/g, "") || (old.kind === "gmail" ? old.pass : "");
+      if (!EMAIL_RX.test(user)) return bad(res, "Please type your Gmail address.");
+      if (!/^[A-Za-z]{16}$/.test(pass)) return bad(res, "The app password is the 16 letters Google showed you (spaces do not matter).");
+      cfg = { kind, user, pass, name: line(b.name, 40) || "Qindiaglobal" };
+    } else if (kind === "brevo") {
+      const key = String(b.key || "").trim() || (old.kind === "brevo" ? old.key : ""), from = normEmail(b.from);
+      if (!key) return bad(res, "Please paste the Brevo API key.");
+      if (!EMAIL_RX.test(from)) return bad(res, "Please type the sender email that you checked on Brevo.");
+      cfg = { kind, key, from, name: line(b.name, 40) || "Qindiaglobal" };
+    } else if (kind !== "") return bad(res, "Unknown choice.");
+    if (cfg) db.prepare("INSERT INTO s_settings(k, v) VALUES('mail', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(JSON.stringify(cfg));
+    else db.prepare("DELETE FROM s_settings WHERE k = 'mail'").run();
+    res.json({ ok: true, on: !!cfg });
+  });
+  r.post("/api/admin/mail/test", owner, async (req, res) => {
+    const c = mailCfg(); if (!mailReady(c)) return bad(res, "Please save the email settings first.");
+    const to = normEmail((req.body && req.body.to) || c.user || c.from);
+    if (!EMAIL_RX.test(to)) return bad(res, "Please check the email address.");
+    try { await sendMail(c, { to, subject: "Qindiaglobal test email", text: "It works. Members can now get password codes by email from qindiaglobal.com." }); }
+    catch (e) { return bad(res, e.message, 502); }
+    res.json({ ok: true, to });
+  });
+  // Owner: give a member a new temporary password (after checking who they are, for example by phone).
+  r.post("/api/admin/community/reset-password", owner, (req, res) => {
+    const u = db.prepare("SELECT * FROM s_users WHERE id = ?").get(Number((req.body || {}).id));
+    if (!u) return bad(res, "Not found.", 404);
+    const abc = "abcdefghjkmnpqrstuvwxyz23456789", pw = Array.from(crypto.randomBytes(10), x => abc[x % abc.length]).join("");
+    const rec = setNewPassword(u, pw);
+    res.json({ username: u.username, password: pw, recovery: rec });
   });
 
   r.post("/api/s/logout", login, (req, res) => { db.prepare("DELETE FROM s_sessions WHERE token_hash = ?").run(req.me.tokenHash); res.json({ ok: true }); });
@@ -208,7 +368,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
       messages: unreadChats(me.id) + ext.unreadGroups(me.id),
-      rulesDue: rulesDue(me), hasPassword: !!me.pass_set, media: memberMedia(),
+      rulesDue: rulesDue(me), hasPassword: !!me.pass_set, email: me.email || "", emailOn: mailReady(mailCfg()), media: memberMedia(),
       linked: db.prepare("SELECT provider FROM s_identities WHERE user_id = ?").all(me.id).map(x => x.provider),
     });
   });

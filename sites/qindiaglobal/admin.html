@@ -102,6 +102,18 @@
     <h3>Members</h3>
     <input id="cSearch" placeholder="Search username or name" style="margin-bottom:10px">
     <div style="overflow-x:auto"><table class="tbl" id="cPeople"></table></div>
+    <h3 id="mail">Email for password codes (free)</h3>
+    <p class="small-note">When this is on, members who forget their password get a 6-digit code by email (they add their email in Community Settings). Easiest: your own Gmail with an "app password". 1) Open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a> and sign in (if Google asks, first turn on 2-Step Verification). 2) Type the name <b>Qindia</b> and tap <b>Create</b>. 3) Copy the 16 letters Google shows, paste them below with your Gmail address, and tap Save. Gmail sends up to about 500 emails a day, free. Codes come from your Gmail address.</p>
+    <div id="mailBox" class="item">
+      <b id="mailState">Loading…</b>
+      <form id="mailForm" style="margin-top:8px">
+        <select id="mailKind" style="margin-bottom:6px"><option value="gmail">My Gmail (app password)</option><option value="brevo">Brevo (free plan, API key)</option><option value="">Off</option></select>
+        <div id="mailGmail"><input id="mailUser" type="email" placeholder="Your Gmail address" autocomplete="off"><input id="mailPass" type="password" placeholder="16-letter app password" autocomplete="off"></div>
+        <div id="mailBrevo" hidden><input id="mailKey" type="password" placeholder="Brevo API key" autocomplete="off"><input id="mailFrom" type="email" placeholder="Sender email checked on Brevo" autocomplete="off"></div>
+        <button class="small-btn">Save</button> <button class="small-btn" type="button" id="mailTest">Send me a test email</button>
+        <p class="msg" id="mailMsg"></p>
+      </form>
+    </div>
     <h3 id="signin">Sign in with Google and Facebook</h3>
     <p class="small-note">Paste the keys you make on Google and Facebook. The buttons appear on the Community log-in page as soon as you tap Save. To switch one off, empty both boxes and tap Save. Members share only their name with us, never their email or friends.</p>
     <div id="oauthBox"></div>
@@ -206,7 +218,32 @@ async function load() {
   loadCommunity().catch(() => {}); loadTurn();
   loadLegal().catch(() => {});
   loadOauth().catch(() => {});
+  loadMail().catch(() => {});
 }
+// ---------- email for password codes ----------
+async function loadMail() {
+  const d = await (await api("/api/admin/mail")).json();
+  $("mailState").textContent = d.on ? "ON: codes are sent from " + (d.user || d.from) + " · " + d.members + " member(s) saved an email" : "Off: members can reset only with their recovery code (or ask you).";
+  $("mailKind").value = d.kind || "gmail"; $("mailUser").value = d.user || ""; $("mailFrom").value = d.from || "";
+  $("mailPass").placeholder = d.saved && d.kind === "gmail" ? "App password (saved; leave empty to keep it)" : "16-letter app password";
+  $("mailKey").placeholder = d.saved && d.kind === "brevo" ? "Brevo API key (saved; leave empty to keep it)" : "Brevo API key";
+  mailKindShow();
+}
+function mailKindShow() { const k = $("mailKind").value; $("mailGmail").hidden = k !== "gmail"; $("mailBrevo").hidden = k !== "brevo"; }
+$("mailKind").onchange = mailKindShow;
+$("mailForm").onsubmit = async e => {
+  e.preventDefault(); const msg = $("mailMsg"); msg.className = "msg"; msg.textContent = "";
+  try {
+    await api("/api/admin/mail", { method: "POST", body: JSON.stringify({ kind: $("mailKind").value, user: $("mailUser").value, pass: $("mailPass").value, key: $("mailKey").value, from: $("mailFrom").value }) });
+    $("mailPass").value = ""; $("mailKey").value = ""; await loadMail();
+    msg.textContent = $("mailKind").value ? "Saved. Tap \"Send me a test email\" to check it." : "Email codes switched off."; msg.classList.add("ok");
+  } catch (err) { msg.textContent = err.message; msg.classList.add("bad"); }
+};
+$("mailTest").onclick = async () => {
+  const msg = $("mailMsg"); msg.className = "msg"; msg.textContent = "Sending…";
+  try { const d = await (await api("/api/admin/mail/test", { method: "POST", body: "{}" })).json(); msg.textContent = "Sent to " + d.to + ". Check your inbox (and Spam)."; msg.classList.add("ok"); }
+  catch (err) { msg.textContent = err.message; msg.classList.add("bad"); }
+};
 // ---------- sign in with Google / Facebook ----------
 async function loadOauth() {
   const d = await (await api("/api/admin/oauth")).json(), box = $("oauthBox"); box.replaceChildren();
@@ -305,6 +342,18 @@ async function loadCommunity() {
     const td = el("td"), b = el("button", "small-btn", u.status === "banned" ? "Unban" : "Ban");
     b.onclick = () => { if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again"; return; } cAct({ action: u.status === "banned" ? "unban" : "ban", id: u.id }); };
     td.append(b);
+    // New temporary password for a member who is locked out (check who they are first, for example by phone).
+    const rp = el("button", "small-btn", "New password");
+    rp.onclick = async () => {
+      if (!rp.dataset.sure) { rp.dataset.sure = "1"; rp.textContent = "Tap again: new password for @" + u.username; return; }
+      try {
+        const d = await (await api("/api/admin/community/reset-password", { method: "POST", body: JSON.stringify({ id: u.id }) })).json();
+        const box = el("div", "item"); box.append(el("b", null, "@" + d.username + " can now log in with this password: " + d.password), el("div", "meta", "New recovery code: " + d.recovery + ". Give both only to the member, privately. They should change the password in Settings."));
+        tr.after(Object.assign(el("tr"), {})); const row = tr.nextSibling, cell = el("td"); cell.colSpan = 8; cell.append(box); row.append(cell);
+        rp.remove();
+      } catch (err) { rp.textContent = err.message; }
+    };
+    td.append(" ", rp);
     if (u.status === "banned") { const del = el("button", "small-btn", "Delete account"); del.onclick = () => { if (!del.dataset.sure) { del.dataset.sure = "1"; del.textContent = "Tap again to delete"; return; } cAct({ action: "user-delete", id: u.id }); }; td.append(" ", del); }
     tr.append(td); t.append(tr);
   });
