@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS s_page_follows_user ON s_page_follows(user_id);
     if (!pg || pg.owner_id !== me.id) return bad(res, "Only the Page's owner can change it.", 403);
     if (b.delete) {
       // Deleting the Page removes its posts too.
-      const files = db.prepare("SELECT photo FROM s_posts WHERE page_id = ? AND photo IS NOT NULL").all(pg.id).map(p => p.photo).concat([pg.avatar, pg.cover].filter(Boolean));
+      const files = db.prepare("SELECT photo, poster FROM s_posts WHERE page_id = ?").all(pg.id).flatMap(p => [p.photo, p.poster]).filter(Boolean).concat([pg.avatar, pg.cover].filter(Boolean));
       db.transaction(() => { db.prepare("DELETE FROM s_posts WHERE page_id = ?").run(pg.id); db.prepare("DELETE FROM s_pages WHERE id = ?").run(pg.id); })();
       files.forEach(dropMedia);
       return res.json({ ok: true });
