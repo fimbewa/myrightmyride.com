@@ -57,6 +57,10 @@
     while ((m = rx.exec(text))) { out.push(text.slice(last, m.index)); out.push(h("a", { href: m[0], target: "_blank", rel: "noopener nofollow ugc", text: m[0] })); last = m.index + m[0].length; }
     out.push(text.slice(last)); return out;
   }
+  // YouTube links play right in the post (youtube-nocookie.com); every other link opens in a new tab. No file is kept on our server.
+  const ytFrame = (id, cls = "pic yt") => h("div", { cls }, h("iframe", { src: "https://www.youtube-nocookie.com/embed/" + id, title: "YouTube video", loading: "lazy",
+    allow: "accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin" }));
+  const ytThumb = id => "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
   const msgBox = () => h("p", { cls: "msg" });
   const say = (box, text, ok) => { box.textContent = text; box.className = "msg " + (ok ? "ok" : "bad"); };
   function needLogin(why) {
@@ -100,7 +104,10 @@
     if (!blob) throw new Error("Could not read the photo.");
     return (await api("/api/s/upload", { method: "POST", raw: blob })).id;
   }
+  // The Community is text only for now (the server says so in /api/s/me): no photo, video or voice buttons.
+  const mediaOn = () => !!(me && me.media);
   function photoPicker(onPick, label = "📷 Photo") {
+    if (!mediaOn()) return null;
     const input = h("input", { type: "file", accept: "image/*", "aria-label": "Add a photo" });
     input.onchange = () => { if (input.files[0]) onPick(input.files[0]); input.value = ""; };
     return h("label", { cls: "sbtn filebtn", title: "Add a photo" }, label, input);
@@ -283,6 +290,8 @@
       p.photo && h("img", { cls: "pic", src: p.photo, alt: "Photo shared by " + p.user.name, loading: "lazy" }),
       p.video && videoEl(p.video, { cls: "pic vid", poster: p.poster || null }),
       p.video && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch" + (p.duration ? " · " + dur(p.duration) : "") + " · " + views(p.views)),
+      !p.video && p.yt && ytFrame(p.yt),
+      !p.video && p.yt && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch · " + views(p.views)),
       p.shared && sharedBox(p.shared),
       h("div", { cls: "acts" }, likeBtn, full ? h("span", { cls: "muted", style: "flex:1;text-align:center;padding:8px", text: "💬 " + p.comments }) : h("a", { href: "#/p/" + p.id }, "💬 " + (p.comments || "") + " Comment"), share));
     return card;
@@ -313,7 +322,7 @@
     const prev = h("div", { cls: "prev", hidden: true });
     const f = h("form", { cls: "card compose" },
       h("div", { cls: "row" }, page ? avatar(page, "sm") : me && avatar(me, "sm"), h("b", { text: page ? "Post as " + page.name : "Share with the community" })),
-      h("textarea", { name: "text", maxlength: 5000, placeholder: "What's happening? Share a good queue you saw, a tip, or a photo." }), prev,
+      h("textarea", { name: "text", maxlength: 5000, placeholder: mediaOn() ? "What's happening? Share a good queue you saw, a tip, or a photo." : "What's happening? Share a good queue you saw, a tip, or paste a link (YouTube, Instagram, news…)." }), prev,
       h("div", { cls: "row" }, photoPicker(async fl => {
         file = fl; photo = null; video = null; prev.hidden = false; prev.replaceChildren(h("p", { cls: "muted", text: "Preparing photo…" }));
         try {
@@ -450,7 +459,7 @@
         me && ["Block", async () => { if (!confirm("Block @" + u.username + "? They will not be able to message you or see your posts.")) return; await api(`/api/s/users/${u.username}/block`, { body: {} }).catch(() => {}); route(); }],
       ]);
     }
-    btns.append(h("a", { cls: "sbtn", href: "#/watch/u/" + u.username }, "▶ Videos"));
+    if (mediaOn()) btns.append(h("a", { cls: "sbtn", href: "#/watch/u/" + u.username }, "▶ Videos"));
     const head = h("div", { cls: "card prof" }, avatar(u, "big"), h("h1", { text: u.name }), h("div", { cls: "muted", text: "@" + u.username + (u.city ? " · " + u.city : "") + (u.followsMe && !u.me ? " · follows you" : "") }),
       u.bio && h("p", { cls: "bio" }, richText(u.bio)),
       h("div", { cls: "nums" }, h("span", {}, h("b", { text: u.posts }), "posts"), h("a", { href: `#/u/${u.username}/followers` }, h("b", { text: u.followers }), "followers"), h("a", { href: `#/u/${u.username}/following` }, h("b", { text: u.following }), "following")), btns);
@@ -563,7 +572,7 @@
     const add = m => {
       const day = new Date(m.at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
       if (day !== lastDay) { box.append(h("div", { cls: "day", text: day })); lastDay = day; }
-      const b = h("div", { cls: "bubble" + (m.mine ? " me" : "") }, m.photo && h("img", { src: m.photo, alt: "Photo", loading: "lazy" }), m.audio && h("audio", { src: m.audio, controls: true, preload: "none" }), m.text, h("small", { text: clock(m.at) }));
+      const b = h("div", { cls: "bubble" + (m.mine ? " me" : "") }, m.photo && h("img", { src: m.photo, alt: "Photo", loading: "lazy" }), m.audio && h("audio", { src: m.audio, controls: true, preload: "none" }), m.text && richText(m.text), h("small", { text: clock(m.at) }));
       b.oncontextmenu = e => { e.preventDefault(); };
       const opts = m.mine ? [["Delete for both", async () => { try { await api(`/api/s/messages/${m.id}/delete`, { body: {} }); b.remove(); } catch (er) { alertNote(er.message); } }]] : [["Report message", () => report("message", m.id)]];
       let press = null;
@@ -661,7 +670,7 @@
       btns.append(fb);
       menu(btns, [["Report Page", () => report("page", pg.id)]]);
     }
-    btns.append(h("a", { cls: "sbtn", href: "#/watch/pg/" + pg.handle }, "▶ Videos"));
+    if (mediaOn()) btns.append(h("a", { cls: "sbtn", href: "#/watch/pg/" + pg.handle }, "▶ Videos"));
     const link = location.origin + "/community#/pg/" + pg.handle;
     btns.append(h("button", { cls: "sbtn", type: "button", onclick: () => navigator.share ? navigator.share({ title: pg.name, url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(pg.name + " on Q India Community: " + link), "_blank") }, "↗ Share"));
     const head = h("div", { cls: "card prof pg" }, pg.cover ? h("img", { cls: "cover", src: pg.cover, alt: "" }) : h("div", { cls: "cover" }), avatar(pg, "big"),
@@ -678,18 +687,18 @@
   // ---------- Watch (like YouTube): videos, channels, views ----------
   const dur = s => { s = Math.round(s || 0); const hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, "0"); return hh ? hh + ":" + String(mm).padStart(2, "0") + ":" + ss : mm + ":" + ss; };
   const views = n => (n >= 100000 ? (n / 100000).toFixed(1).replace(/\.0$/, "") + " lakh" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n || 0)) + " view" + (n === 1 ? "" : "s");
-  const titleOf = v => { const t = (v.text || "").split("\n")[0].trim(); return t ? ([...t].length > 90 ? [...t].slice(0, 90).join("") + "…" : t) : "Video by " + v.user.name; };
+  const titleOf = v => { const t = (v.text || "").replace(/https?:\/\/\S+/g, "").split("\n").map(x => x.trim()).find(Boolean) || ""; return t ? ([...t].length > 90 ? [...t].slice(0, 90).join("") + "…" : t) : "Video by " + v.user.name; };
   const videoTile = v => h("a", { cls: "vt", href: "#/v/" + v.id },
-    h("span", { cls: "thumb" }, v.poster ? h("img", { src: v.poster, alt: "", loading: "lazy" }) : h("video", { src: v.video + "#t=0.5", preload: "metadata", muted: true, playsinline: true }), v.duration > 0 && h("i", { text: dur(v.duration) })),
+    h("span", { cls: "thumb" }, !v.video && v.yt ? h("img", { src: ytThumb(v.yt), alt: "", loading: "lazy" }) : v.poster ? h("img", { src: v.poster, alt: "", loading: "lazy" }) : h("video", { src: v.video + "#t=0.5", preload: "metadata", muted: true, playsinline: true }), v.duration > 0 && h("i", { text: dur(v.duration) })),
     h("span", { cls: "row", style: "align-items:flex-start" }, avatar(v.user, "sm"), h("span", { cls: "grow" }, h("b", { text: titleOf(v) }), h("small", { cls: "muted", text: v.user.name + " · " + views(v.views) + " · " + ago(v.created_at) }))));
-  const watchTabs = on => h("div", { cls: "tabs" }, [["#/reels", "Reels", "reels"], ["#/watch", "Latest", "latest"], ["#/watch/popular", "Popular", "popular"], me && ["#/watch/subs", "Subscriptions", "subs"]].filter(Boolean)
+  const watchTabs = on => h("div", { cls: "tabs" }, [mediaOn() && ["#/reels", "Reels", "reels"], ["#/watch", "Latest", "latest"], ["#/watch/popular", "Popular", "popular"], me && ["#/watch/subs", "Subscriptions", "subs"]].filter(Boolean)
     .map(([href, label, k]) => h("a", { href, cls: on === k ? "on" : "" }, label)));
   async function watchPage(a, b) {
     const sort = a === "popular" || a === "subs" ? a : "latest";
     const chan = a === "u" ? "user=" + encodeURIComponent(b) : a === "pg" ? "page=" + encodeURIComponent(b) : "";
     const grid = h("div", { cls: "vgrid" });
     const title = chan ? h("div", { cls: "row", style: "margin:14px 0 6px" }, h("a", { cls: "sbtn", href: (a === "pg" ? "#/pg/" : "#/u/") + b }, "←"), h("h1", { style: "margin:0", text: "Videos" })) : null;
-    show(title || h("h1", { text: "Watch" }), !chan && watchTabs(sort), !chan && me && h("p", {}, h("a", { cls: "sbtn main", href: "#/new" }, "＋ Upload a video")), grid);
+    show(title || h("h1", { text: "Watch" }), !chan && watchTabs(sort), !chan && me && h("p", {}, h("a", { cls: "sbtn main", href: "#/new" }, mediaOn() ? "＋ Upload a video" : "＋ Post a YouTube link")), grid);
     let skip = 0;
     const load = async () => {
       let d; try { d = await api(`/api/s/watch?${chan || "sort=" + sort}&skip=${skip}`); } catch (e) { return grid.append(h("p", { cls: "empty", text: e.message })); }
@@ -702,8 +711,9 @@
   async function videoPage(id) {
     let d; try { d = await api("/api/s/watch/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
     const v = d.video, ch = d.channel;
-    const player = h("video", { cls: "player", src: v.video, poster: v.poster || null, controls: true, playsinline: true, autoplay: true, preload: "metadata" });
+    const player = !v.video && v.yt ? ytFrame(v.yt, "player yt") : h("video", { cls: "player", src: v.video, poster: v.poster || null, controls: true, playsinline: true, autoplay: true, preload: "metadata" });
     let counted = false;
+    if (!v.video) { counted = true; api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {}); } // a YouTube player cannot tell us when it plays
     player.onplay = () => { if (!counted) { counted = true; api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {}); } };
     const sub = !ch.mine && h("button", { cls: "sbtn " + (ch.subscribed ? "" : "dark") }, ch.subscribed ? "Subscribed ✓" : "Subscribe");
     if (sub) sub.onclick = async () => {
@@ -718,7 +728,7 @@
       try { const r = await api(`/api/s/posts/${v.id}/like`, { body: { like: !v.liked } }); v.liked = r.liked; v.likes = r.likes; like.className = "sbtn" + (v.liked ? " main" : ""); like.textContent = (v.liked ? "♥ " : "♡ ") + (v.likes || "") + " Like"; } catch (e) { alertNote(e.message); }
     };
     const link = location.origin + "/community#/v/" + v.id;
-    const desc = (v.text || "").split("\n").slice(1).join("\n").trim();
+    const desc = (v.text || "").trim();
     show(h("div", { cls: "watch" }, player),
       h("h1", { cls: "vtitle", text: titleOf(v) }), h("p", { cls: "muted", style: "margin:0", text: views(v.views) + " · " + ago(v.created_at) }),
       v.status === "pending" && h("p", { cls: "note", text: "Only you can see this until the site owner checks it." }),
@@ -783,6 +793,7 @@
     });
   }
   function videoPicker(onPick) {
+    if (!mediaOn()) return null;
     const input = h("input", { type: "file", accept: "video/mp4,video/webm,video/quicktime,video/*", "aria-label": "Add a video" });
     input.onchange = () => { if (input.files[0]) onPick(input.files[0]); input.value = ""; };
     return h("label", { cls: "sbtn filebtn", title: "Add a short video" }, "🎬 Video", input);
@@ -790,6 +801,7 @@
   const videoEl = (src, extra = {}) => h("video", { cls: "vid", src: src + "#t=0.1", controls: true, playsinline: true, preload: "metadata", ...extra });
   // 🎤 button for chats: tap to record, tap ✓ to send, ✕ to cancel. Stops by itself after 2 minutes.
   function voiceButton(onDone, onError) {
+    if (!mediaOn()) return null;
     const wrap = h("span", { cls: "voice" });
     const mic = h("button", { type: "button", cls: "sbtn", "aria-label": "Record a voice message", title: "Voice message" }, "🎤");
     wrap.append(mic);
@@ -854,7 +866,7 @@
         d.posts.filter(p => !seen.has(p.id)).forEach(p => { seen.add(p.id); list.append(reel(p)); });
         if (d.posts.length) before = Math.min(...d.posts.map(p => p.id));
         done = !d.more;
-        if (!list.children.length) list.replaceWith(h("div", { cls: "empty" }, h("p", { text: "No videos yet. Be the first to share a short video of a good queue!" }), me && h("a", { cls: "sbtn main", href: "#/new" }, "＋ Add a video")));
+        if (!list.children.length) list.replaceWith(h("div", { cls: "empty" }, h("p", { text: mediaOn() ? "No videos yet. Be the first to share a short video of a good queue!" : "No videos here. The Community is text only for now." }), mediaOn() && h("a", { cls: "sbtn main", href: "#/new" }, "＋ Add a video")));
       } catch (e) { alertNote(e.message); } finally { busy = false; }
     };
     list.onscroll = () => { if (list.scrollTop + list.clientHeight * 2 > list.scrollHeight) more(); };
@@ -946,7 +958,7 @@
       stage, h("div", { cls: "row" }, pick, colour), h("button", { cls: "btn" }, "Share status"), m);
     f.onsubmit = async e => {
       e.preventDefault();
-      if (!ta.value.trim() && !file) return say(m, "Type something or choose a photo.");
+      if (!ta.value.trim() && !file) return say(m, mediaOn() ? "Type something or choose a photo." : "Type something first.");
       say(m, "Please wait…", true);
       try {
         if (file && !photo) photo = await uploadPhoto(file);
@@ -1007,7 +1019,7 @@
       lastId = Math.max(lastId, x.id);
       if (x.info) return box.append(h("div", { cls: "day info", text: x.text }));
       const b = h("div", { cls: "bubble" + (x.mine ? " me" : "") }, !x.mine && x.user && h("a", { cls: "from", href: "#/u/" + x.user.username, text: x.user.name }),
-        x.photo && h("img", { src: x.photo, alt: "Photo", loading: "lazy" }), x.audio && h("audio", { src: x.audio, controls: true, preload: "none" }), x.text, h("small", { text: clock(x.at) }));
+        x.photo && h("img", { src: x.photo, alt: "Photo", loading: "lazy" }), x.audio && h("audio", { src: x.audio, controls: true, preload: "none" }), x.text && richText(x.text), h("small", { text: clock(x.at) }));
       const opts = [(x.mine || g.admin) && ["Delete for everyone", async () => { try { await api(`/api/s/group-messages/${x.id}/delete`, { body: {} }); b.remove(); } catch (er) { alertNote(er.message); } }],
         !x.mine && ["Report message", () => report("groupmsg", x.id)]].filter(Boolean);
       let press = null;

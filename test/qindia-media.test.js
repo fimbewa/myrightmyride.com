@@ -5,6 +5,7 @@ const http = require("node:http");
 const os = require("node:os"), path = require("node:path"), fs = require("node:fs");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qim-"));
+process.env.QI_MEMBER_MEDIA = "1"; // these tests check uploads; the live site is text only
 process.env.DB_FILE = path.join(dir, "test.db");
 process.env.ADMIN_PASSWORD = "testpass123";
 process.env.QI_MIN_FILL_MS = "0";
@@ -88,4 +89,17 @@ test("voice messages: private chats between mutual followers, and groups", async
   await call("POST", "/api/admin/community", { action: "groupmsg-delete", id: gm.id }, { token: own });
   assert.equal((await call("GET", "/media/" + o)).status, 404);
   assert.equal(require("../server/db").prepare("SELECT photo FROM q_legal_hold WHERE kind = 'groupmsg'").get().photo, o);
+});
+
+test("text only (the live setting): no photo, video or voice uploads; text posts still work", async () => {
+  delete process.env.QI_MEMBER_MEDIA;
+  try {
+    const T = await signup("textonly");
+    for (const p of ["/api/s/upload", "/api/s/upload-av?kind=video", "/api/s/upload-av?kind=audio"]) {
+      const r = await call("POST", p, null, { token: T, raw: p.includes("audio") || p.includes("video") ? MP4 : JPG });
+      assert.equal(r.status, 403, p); assert.match(r.data.error, /text only/);
+    }
+    assert.equal((await call("GET", "/api/s/me", null, { token: T })).data.media, false);
+    assert.equal((await call("POST", "/api/s/posts", { text: "Stand in the queue, please." }, { token: T })).status, 200);
+  } finally { process.env.QI_MEMBER_MEDIA = "1"; }
 });

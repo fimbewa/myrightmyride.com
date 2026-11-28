@@ -5,6 +5,7 @@ const http = require("node:http");
 const os = require("node:os"), path = require("node:path"), fs = require("node:fs");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qiw-"));
+process.env.QI_MEMBER_MEDIA = "1"; // these tests check uploads; the live site is text only
 process.env.DB_FILE = path.join(dir, "test.db");
 process.env.ADMIN_PASSWORD = "testpass123";
 process.env.QI_MIN_FILL_MS = "0";
@@ -74,4 +75,21 @@ test("watch: long videos, cover picture, views once per person, channels, subscr
   await new Promise(r => setTimeout(r, 50));
   assert.equal((await call("GET", "/media/" + cover)).status, 404);
   assert.equal((await call("GET", "/api/s/watch/" + long.id)).status, 404);
+});
+
+test("watch: a text post with a YouTube link is a video on Watch; other links are plain posts", async () => {
+  const Y = await signup("ytposter");
+  const yt = (await call("POST", "/api/s/posts", { text: "Good queue at Dadar station\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5" }, { token: Y })).data.post;
+  assert.equal(yt.yt, "dQw4w9WgXcQ"); assert.equal(yt.status, "ok", "a link alone does not make a post wait");
+  const short = (await call("POST", "/api/s/posts", { text: "https://youtube.com/shorts/abcdefghijk" }, { token: Y })).data.post;
+  assert.equal(short.yt, "abcdefghijk");
+  const plain = (await call("POST", "/api/s/posts", { text: "News: https://example.org/queue-story" }, { token: Y })).data.post;
+  assert.equal(plain.yt, undefined);
+  const list = (await call("GET", "/api/s/watch?user=ytposter")).data.videos.map(v => v.id);
+  assert.deepEqual(list.sort(), [yt.id, short.id].sort());
+  const one = (await call("GET", "/api/s/watch/" + yt.id)).data;
+  assert.equal(one.video.yt, "dQw4w9WgXcQ"); assert.equal(one.channel.username, "ytposter");
+  assert.equal((await call("GET", "/api/s/watch/" + plain.id)).status, 404);
+  await call("POST", `/api/s/watch/${yt.id}/view`, {}, { token: Y });
+  assert.equal((await call("GET", "/api/s/watch/" + yt.id)).data.video.views, 1);
 });

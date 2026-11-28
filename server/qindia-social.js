@@ -16,6 +16,13 @@ const LONG_VIDEO_MAX = 100 * 1024 * 1024; // 100 MB per longer video for Watch (
 const AUDIO_MAX = 3 * 1024 * 1024;        // 3 MB per voice message (2 minutes is about 1 MB)
 // Media files: <32 hex>.<ext>. The extension tells the kind: jpg = photo, mp4/webm = video, m4a/weba/ogg = voice.
 const MEDIA_RX = /^[a-f0-9]{32}\.(jpg|mp4|webm|m4a|weba|ogg)$/;
+// Members' photos, videos and voice messages are OFF: the Community is text only, so the server never fills up
+// (the site owner's decision, 28 Nov 2026). Files already uploaded still show. QI_MEMBER_MEDIA=1 turns uploads back on.
+// A YouTube link in a post plays in the post and lists the post on Watch (the video stays on YouTube).
+const YT_RX = /(?:youtube\.com\/(?:watch\?(?:\S*?&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/;
+const ytOf = text => { const m = String(text || "").match(YT_RX); return m ? m[1] : null; };
+const memberMedia = () => process.env.QI_MEMBER_MEDIA === "1";
+const TEXT_ONLY = "Qindia Community is text only: photos, videos and voice messages cannot be added.";
 const KIND_OF = { jpg: "photo", mp4: "video", webm: "video", m4a: "audio", weba: "audio", ogg: "audio" };
 const mediaKind = name => (name ? KIND_OF[String(name).split(".").pop()] || null : null);
 // { photo } or { video } or { audio } with the address, for one stored media name.
@@ -99,7 +106,8 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   // IT Intermediary Rules 2021, rule 3(1)(c): remind every member of the rules at least once every three months
   // and whenever the rules change. RULES_DATE is the "last updated" date of /legal/terms.
   if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === "rules_seen")) db.exec("ALTER TABLE s_users ADD COLUMN rules_seen INTEGER");
-  const RULES_DATE = Date.UTC(2026, 10, 28), REMIND_MS = 90 * 24 * 3600_000;
+  const RULES_DATE = Date.UTC(2026, 10, 28, 9, 0), // text and links only (version 1.2)
+    REMIND_MS = 90 * 24 * 3600_000;
   const rulesDue = u => !u.rules_seen || u.rules_seen < RULES_DATE || Date.now() - u.rules_seen > REMIND_MS;
 
   const r = express.Router();
@@ -200,7 +208,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
       messages: unreadChats(me.id) + ext.unreadGroups(me.id),
-      rulesDue: rulesDue(me), hasPassword: !!me.pass_set,
+      rulesDue: rulesDue(me), hasPassword: !!me.pass_set, media: memberMedia(),
       linked: db.prepare("SELECT provider FROM s_identities WHERE user_id = ?").all(me.id).map(x => x.provider),
     });
   });
@@ -277,6 +285,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   function diskFree() { try { const s = fs.statfsSync(MEDIA); return s.bavail * s.bsize; } catch { return Infinity; } }
   r.post("/api/s/upload", login, express.raw({ type: () => true, limit: PHOTO_MAX }), (req, res) => {
     const me = req.me;
+    if (!memberMedia()) return bad(res, TEXT_ONLY, 403);
     if (limited(req, "upload:" + me.id, 60, 24 * 3600_000)) return bad(res, "You have added many photos today. Please try tomorrow.", 429);
     if (diskFree() < MIN_FREE_DISK) return bad(res, "Photo space on the server is full for now. Please post text only; the owner has been told.", 507);
     const jpg = Buffer.isBuffer(req.body) ? stripJpeg(req.body) : null;
@@ -296,6 +305,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   }
   r.post("/api/s/upload-av", login, express.raw({ type: () => true, limit: LONG_VIDEO_MAX }), (req, res) => {
     const me = req.me, kind = req.query.kind === "audio" ? "audio" : "video";
+    if (!memberMedia()) return bad(res, TEXT_ONLY, 403);
     if (kind === "video" && req.query.long !== "1" && Buffer.isBuffer(req.body) && req.body.length > VIDEO_MAX) return bad(res, "This video is too big for a short video.", 413);
     if (kind === "video" ? limited(req, "video:" + me.id, 15, 24 * 3600_000) : limited(req, "voice:" + me.id, 300, 24 * 3600_000))
       return bad(res, kind === "video" ? "You have added many videos today. Please try tomorrow." : "You have sent many voice messages today. Please try tomorrow.", 429);
@@ -333,6 +343,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     const out = {
       id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
       ...(mediaKind(p.photo) === "video" ? { poster: p.poster ? "/media/" + p.poster : null, duration: p.duration || 0, views: p.views || 0 } : {}),
+      ...(!p.photo && ytOf(p.text) ? { yt: ytOf(p.text), views: p.views || 0 } : {}),
       likes: p.likes, comments: p.comments, created_at: p.created_at,
       liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
       mine: meId === p.user_id,
@@ -650,7 +661,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   });
 
   // ---------- group chats and Status / Stories (server/qindia-groups.js, server/qindia-stories.js) ----------
-  const ext = { db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
+  const ext = { ytOf, db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
     reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
   require("./qindia-groups")(ext);
   require("./qindia-stories")(ext);
@@ -672,7 +683,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
       messagesToday: n(`SELECT COUNT(*) AS n FROM s_messages WHERE created_at > ${day}`),
       ...Object.fromEntries(Object.entries(ext.ownerCounts).map(([k, f]) => [k, f()])),
       ...Object.fromEntries(Object.entries(ext.ownerPending).map(([k, f]) => ["pending" + k[0].toUpperCase() + k.slice(1), f()])),
-      photoMB: Math.round(n("SELECT IFNULL(SUM(bytes),0) AS n FROM s_media") / 1048576),
+      photoMB: Math.round(n("SELECT IFNULL(SUM(bytes),0) AS n FROM s_media") / 1048576), mediaFiles: n("SELECT COUNT(*) AS n FROM s_media"), memberMedia: memberMedia(),
       freeGB: Math.round(diskFree() / 1024 ** 3), photoApproval: photoApproval(),
       pendingPosts: db.prepare("SELECT p.*, u.username FROM s_posts p JOIN s_users u ON u.id = p.user_id WHERE p.status = 'pending' ORDER BY p.id LIMIT 200").all()
         .map(p => ({ id: p.id, username: p.username, text: p.text, photo: p.photo && "/media/" + p.photo, reports: p.reports, at: p.created_at })),

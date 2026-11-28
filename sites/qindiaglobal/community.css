@@ -207,3 +207,7 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .c-btn.end{background:#e53935;transform:rotate(135deg)}
 .c-btn.ok{background:#25d366}
 .call.ring .c-local{display:none}
+/* YouTube links play inside the post and on Watch (the video stays on YouTube; nothing is stored here) */
+.yt{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.player.yt{border-radius:0}

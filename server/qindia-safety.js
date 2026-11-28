@@ -102,7 +102,7 @@ function isDoubtful(text) {
   const letters = s.match(/[a-z]/gi) || [], caps = s.match(/[A-Z]/g) || [];
   if (letters.length >= 10 && caps.length / letters.length > 0.6) return true;
   if (/(.)\1{4,}/u.test(s)) return true;
-  const symbols = s.replace(/[\p{L}\p{M}\p{N}\s.,!?'"()-]/gu, "");
+  const symbols = s.replace(/https?:\/\/\S+/g, "").replace(/[\p{L}\p{M}\p{N}\s.,!?'"()-]/gu, "");
   if (symbols.length > Math.max(3, s.length * 0.15)) return true;
   return DOUBT_WORDS.some(w => /^[a-z ]+$/.test(w) ? new RegExp("[^a-z]" + w + "[^a-z]").test(low) : low.includes(w));
 }
