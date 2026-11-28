@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Posters to print · Qindiaglobal</title>
+<meta name="description" content="Free print-ready Qindiaglobal posters in English, Hindi and Marathi, A4 and A3 PDF. पोस्टर डाउनलोड करें और छापें।">
+<meta name="theme-color" content="#1d3557">
+<link rel="canonical" href="https://qindiaglobal.com/posters">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.ph-head{text-align:center;padding:20px 0 6px}
+.ph-head h1{font-size:28px;margin:0 0 6px;color:var(--deep)}
+.ph-head p{margin:0 auto;max-width:620px;color:var(--muted)}
+.tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+.tabs button{font:inherit;font-weight:700;border-radius:999px;padding:9px 18px;border:2px solid var(--deep);background:#fff;color:var(--deep);cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--deep);color:#fff}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.pcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:10px;align-content:start}
+.pcard img{width:100%;height:auto;aspect-ratio:210/297;border-radius:8px;border:1px solid var(--line);display:block;background:#f3f5f9}
+.pcard strong{font-size:16px;color:var(--deep)}
+.pcard .dl{display:flex;gap:8px}
+.pcard .dl a{flex:1;text-align:center;border-radius:999px;padding:9px 6px;font-weight:700;text-decoration:none;background:var(--accent);color:#fff;font-size:14px}
+.pcard .dl a.a3{background:var(--deep)}
+.allzip{text-align:center;margin:24px 0}
+.tips{background:var(--bg);border-radius:14px;padding:14px 18px;margin:20px 0}
+.tips h2{font-size:18px;margin:0 0 8px;color:var(--deep)}
+.tips ul{margin:0;padding-inline-start:20px}.tips li{margin:5px 0;font-size:15px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="Qindiaglobal home"><b>Q</b>india<span>global</span></a>
+    <select id="lang" aria-label="Language"></select>
+  </div>
+</header>
+<main class="wrap block">
+  <div class="ph-head">
+    <h1>Posters to print · पोस्टर छापें · पोस्टर छापा</h1>
+    <p>Free, print-ready posters. Download, print and put them up at bus stops, stations, metro gates, schools, offices and housing societies.<br>
+    मुफ़्त पोस्टर डाउनलोड करें, छापें और लगाएँ। · मोफत पोस्टर डाउनलोड करा, छापा आणि लावा.</p>
+  </div>
+
+  <div class="tabs" role="group" aria-label="Poster language">
+    <button type="button" data-l="en">English</button>
+    <button type="button" data-l="hi">हिन्दी</button>
+    <button type="button" data-l="mr">मराठी</button>
+  </div>
+
+  <div class="pgrid" id="grid"></div>
+
+  <p class="allzip"><a class="btn" href="/print/qindiaglobal-posters-all.zip" download>Download all 24 posters (ZIP) · सभी पोस्टर</a></p>
+
+  <div class="tips">
+    <h2>Printing tips · छपाई के सुझाव</h2>
+    <ul>
+      <li><b>A4</b> fits any home or office printer. <b>A3</b> is twice as big, for walls and notice boards. Take the A3 file to any print shop.</li>
+      <li>The files have a 3 mm bleed for print shops. Ask them to print at actual size (100%) and trim to A4 or A3. On a home printer, choose "Fit to page".</li>
+      <li>Every poster has a QR code. People can scan it with their phone camera to open qindiaglobal.com.</li>
+      <li>Please ask the owner of the place before you put up a poster, and follow local rules on posters.</li>
+      <li lang="hi">A4 घर या दफ़्तर के प्रिंटर के लिए है, A3 बड़ा है और प्रिंट की दुकान पर छपवाएँ। पोस्टर लगाने से पहले जगह के मालिक से अनुमति लें।</li>
+      <li lang="mr">A4 घरच्या किंवा कार्यालयातील प्रिंटरसाठी, A3 मोठा आहे आणि प्रिंटच्या दुकानात छापून घ्या. पोस्टर लावण्यापूर्वी जागेच्या मालकाची परवानगी घ्या.</li>
+    </ul>
+  </div>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
+    <p class="small"><span data-t="tagline"></span> · qindiaglobal.com</p>
+  </div>
+</footer>
+<script src="/i18n.js"></script>
+<script src="/i18n-in1.js"></script>
+<script src="/i18n-in2.js"></script>
+<script>
+(function () {
+  const names = {
+    habits: { en: "5 queue habits", hi: "कतार की 5 आदतें", mr: "रांगेच्या 5 सवयी" },
+    sign: { en: "Please queue here (sign)", hi: "कृपया यहाँ कतार लगाएँ (साइन)", mr: "कृपया येथे रांग लावा (फलक)" },
+    pledge: { en: "Take the pledge", hi: "संकल्प लें", mr: "संकल्प करा" },
+    app: { en: "Community app", hi: "कम्युनिटी ऐप", mr: "कम्युनिटी ॲप" }
+  };
+  const grid = document.getElementById("grid"), btns = document.querySelectorAll(".tabs button");
+  function show(l) {
+    btns.forEach(b => b.setAttribute("aria-pressed", b.dataset.l === l));
+    grid.innerHTML = "";
+    for (const k of Object.keys(names)) {
+      const f = "/print/qindiaglobal-" + k + "-" + l, c = document.createElement("div");
+      c.className = "pcard";
+      c.innerHTML = '<a href="' + f + '-A4.pdf" target="_blank" rel="noopener"><img loading="lazy" alt=""></a><strong></strong>' +
+        '<div class="dl"><a href="' + f + '-A4.pdf" download>A4 PDF</a><a class="a3" href="' + f + '-A3.pdf" download>A3 PDF</a></div>';
+      c.querySelector("img").src = "/print/" + k + "-" + l + ".jpg";
+      c.querySelector("img").alt = names[k][l];
+      c.querySelector("strong").textContent = names[k][l];
+      grid.append(c);
+    }
+  }
+  btns.forEach(b => b.onclick = () => show(b.dataset.l));
+  const sel = document.getElementById("lang"); QI_fillSelect(sel);
+  const go = l => { sel.value = l; QI_apply(l); document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; document.querySelector("main").dir = "ltr"; show(["hi", "mr"].includes(l) ? l : "en"); };
+  sel.onchange = () => go(sel.value); go(QI_pick());
+})();
+</script>
+</body>
+</html>
