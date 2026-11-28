@@ -84,8 +84,9 @@
       <div class="stat"><b id="cStories">0</b>Status updates now</div>
       <div class="stat"><b id="cPages">0</b>Pages</div>
       <div class="stat"><b id="cCalls">0</b>calls today</div>
-      <div class="stat"><b id="cDisk">0</b>photos MB / free GB</div>
+      <div class="stat"><b id="cDisk">0</b>old members' files (count · MB) / free GB</div>
     </div>
+    <p class="muted" style="margin:6px 0">The Community is text and links only: members cannot add photos, videos or voice messages, so nothing new is stored. Files added before 28 Nov 2026 still show.</p>
     <label style="display:flex;gap:10px;align-items:center;margin:8px 0 14px"><input type="checkbox" id="cPhotoApproval" style="width:auto"> Photos wait for my approval before everyone sees them (recommended while the community is small)</label>
     <details style="margin:0 0 14px"><summary>Calls: relay server (optional)</summary>
       <p style="font-size:14px">Voice and video calls go directly between the two phones. On some mobile networks that is not possible, and those calls fail. A TURN relay server fixes this. Running one costs money, so it is optional. If you get one, paste its details here.</p>
@@ -270,7 +271,7 @@ async function loadCommunity() {
   const q = $("cSearch").value.trim();
   const d = await (await api("/api/admin/community?q=" + encodeURIComponent(q))).json();
   $("cUsers").textContent = d.users; $("cUsersToday").textContent = d.usersToday; $("cPosts").textContent = d.posts; $("cPostsToday").textContent = d.postsToday;
-  $("cMsgsToday").textContent = d.messagesToday; $("cGroups").textContent = d.groups || 0; $("cGroupMsgsToday").textContent = d.groupMessagesToday || 0; $("cStories").textContent = d.storiesLive || 0; $("cPages").textContent = d.pages || 0; $("cCalls").textContent = d.callsToday || 0; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
+  $("cMsgsToday").textContent = d.messagesToday; $("cGroups").textContent = d.groups || 0; $("cGroupMsgsToday").textContent = d.groupMessagesToday || 0; $("cStories").textContent = d.storiesLive || 0; $("cPages").textContent = d.pages || 0; $("cCalls").textContent = d.callsToday || 0; $("cDisk").textContent = (d.mediaFiles || 0) + " · " + d.photoMB + " MB / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
   const pend = $("cPending"); pend.replaceChildren();
   d.pendingPosts.forEach(p => pend.append(cItem("Post · " + when(p.at) + (p.reports ? " · " + p.reports + " report(s)" : ""), p.username, p.text, p.photo,
     [["Approve", { action: "post-ok", id: p.id }], ["Hide", { action: "post-hide", id: p.id }], ["Delete", { action: "post-delete", id: p.id }, true]])));

@@ -6,6 +6,7 @@ const http = require("node:http");
 const os = require("node:os"), path = require("node:path"), fs = require("node:fs");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qis-"));
+process.env.QI_MEMBER_MEDIA = "1"; // these tests check uploads; the live site is text only
 process.env.DB_FILE = path.join(dir, "test.db");
 process.env.ADMIN_PASSWORD = "testpass123";
 process.env.QI_MIN_FILL_MS = "0";
