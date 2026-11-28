@@ -657,6 +657,8 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   Object.assign(ext, { POST_SQL, visible, notBlocked, postOut, before, PAGE, ipHash, who });
   require("./qindia-pages")(ext);
   require("./qindia-watch")(ext);
+  Object.assign(ext, { owner, setting });
+  require("./qindia-calls")(ext);
 
   // ---------- owner: community moderation on /admin ----------
   r.get("/api/admin/community", owner, (req, res) => {

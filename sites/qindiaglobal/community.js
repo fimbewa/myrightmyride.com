@@ -586,6 +586,8 @@
     f.onsubmit = e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ""; send(t); };
     ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer:fine)").matches) { e.preventDefault(); f.requestSubmit(); } };
     const head = h("div", { cls: "head" }, h("a", { href: "#/chats", cls: "sbtn", "aria-label": "Back" }, "←"), whoLink(u, u.last_seen && Date.now() - u.last_seen < 15 * 60_000 ? "active now" : u.last_seen ? "active " + ago(u.last_seen) + (Date.now() - u.last_seen < 7 * 86400_000 ? " ago" : "") : ""));
+    head.append(h("button", { type: "button", cls: "sbtn callbtn", "aria-label": "Voice call", title: "Voice call", onclick: () => startCall(u, "audio") }, "📞"),
+      h("button", { type: "button", cls: "sbtn callbtn", "aria-label": "Video call", title: "Video call", onclick: () => startCall(u, "video") }, "📹"));
     menu(head, [["Report @" + u.username, () => report("user", u.username)], ["Block @" + u.username, async () => { if (!confirm("Block @" + u.username + "?")) return; await api(`/api/s/users/${u.username}/block`, { body: {} }).catch(() => {}); go("#/chats"); }]]);
     const notes = h("div");
     const setCannot = why => notes.replaceChildren(...(why ? [h("p", { cls: "note", text: why })] : []));
@@ -1099,6 +1101,119 @@
     show(h("div", { cls: "card prof" }, avatar(g, "big"), h("h1", { text: g.name }), h("div", { cls: "muted", text: "Group · " + g.members + " members" }), g.about && h("p", { cls: "bio" }, richText(g.about)),
       h("p", { cls: "muted", text: "You were invited to this group. Members will see your name and messages." }), b, m));
   }
+
+  // ---------- voice and video calls (WebRTC, phone to phone) ----------
+  let callOn = null; // the call on screen, if any
+  let iceCfg = null;
+  const getIce = async () => iceCfg || (iceCfg = await api("/api/s/calls/config"));
+  // Waits until the phone has found its network addresses (at most 4 seconds), so one message carries everything.
+  const gathered = pc => new Promise(ok => { if (pc.iceGatheringState === "complete") return ok(); const t = setTimeout(ok, 4000); pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") { clearTimeout(t); ok(); } }); });
+  function ringTone() {
+    let ctx = null, timer = null;
+    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    const beep = () => { try { navigator.vibrate && navigator.vibrate([400, 200, 400]); if (!ctx) return; const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 480; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.8); } catch {} };
+    beep(); timer = setInterval(beep, 2500);
+    return () => { clearInterval(timer); try { navigator.vibrate && navigator.vibrate(0); ctx && ctx.close(); } catch {} };
+  }
+  function callScreen(user, kind, label) {
+    const remote = h("video", { cls: "c-remote", autoplay: true, playsinline: true });
+    const local = h("video", { cls: "c-local", autoplay: true, playsinline: true, muted: true });
+    const state = h("p", { cls: "c-state", text: label });
+    const btns = h("div", { cls: "c-btns" });
+    const box = h("div", { cls: "call " + kind, role: "dialog", "aria-label": "Call with " + user.name }, remote, h("div", { cls: "c-who" }, avatar(user, "big"), h("h2", { text: user.name }), state), local, btns);
+    document.body.append(box);
+    return { box, remote, local, state, btns, close: () => box.remove() };
+  }
+  // The call on screen: buttons, timer, hang up. ringing=true shows only "Cancel" until live() is called.
+  function inCall(ui, pc, stream, callId, kind, ringing) {
+    let muted = false, camOff = false, t0 = null, tick = null, ended = false;
+    const mic = h("button", { type: "button", cls: "c-btn", "aria-label": "Mute" }, "🎤");
+    mic.onclick = () => { muted = !muted; stream.getAudioTracks().forEach(t => { t.enabled = !muted; }); mic.classList.toggle("off", muted); };
+    const cam = kind === "video" && h("button", { type: "button", cls: "c-btn", "aria-label": "Camera off" }, "📷");
+    if (cam) cam.onclick = () => { camOff = !camOff; stream.getVideoTracks().forEach(t => { t.enabled = !camOff; }); cam.classList.toggle("off", camOff); };
+    const hang = h("button", { type: "button", cls: "c-btn end", "aria-label": "End call" }, "📞");
+    const finish = async (why, tell = true) => {
+      if (ended) return; ended = true; clearInterval(tick); clearInterval(watch);
+      try { pc.close(); } catch {} stream.getTracks().forEach(t => t.stop());
+      if (tell) api(`/api/s/calls/${callId}/end`, { body: {} }).catch(() => {});
+      ui.state.textContent = why || "Call ended"; ui.btns.replaceChildren();
+      setTimeout(() => { ui.close(); callOn = null; }, 1500);
+    };
+    hang.onclick = () => finish("Call ended");
+    const live = () => ui.btns.replaceChildren(mic, cam || "", hang);
+    if (ringing) { const cancel = h("button", { type: "button", cls: "c-btn end", "aria-label": "Cancel call" }, "📞"); cancel.onclick = () => finish("Call cancelled"); ui.btns.replaceChildren(cancel); } else live();
+    pc.ontrack = e => { ui.remote.srcObject = e.streams[0]; };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected" && !t0) { t0 = Date.now(); ui.box.classList.add("live"); tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); ui.state.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 1000); }
+      if (pc.connectionState === "failed") finish("Could not connect. The network may be blocking calls.");
+    };
+    // The other person hung up?
+    const watch = setInterval(async () => { const c = await api("/api/s/calls/" + callId).catch(() => null); if (c && c.status !== "accepted" && c.status !== "ringing") finish(c.status === "declined" ? "Call declined" : c.status === "missed" ? "No answer" : "Call ended", false); }, 3000);
+    callOn = { finish, live };
+    return callOn;
+  }
+  async function media(kind) {
+    try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === "video" ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } : false }); }
+    catch { throw new Error(kind === "video" ? "Please allow the camera and microphone to make a video call." : "Please allow the microphone to make a call."); }
+  }
+  async function startCall(user, kind) {
+    if (callOn) return;
+    if (!window.RTCPeerConnection || !navigator.mediaDevices) return alertNote("Calls do not work in this browser. Please use Chrome or the Qindia app.");
+    callOn = {};
+    const ui = callScreen(user, kind, "Starting…");
+    let stream, pc, id = null;
+    const fail = msg => { try { pc && pc.close(); } catch {} stream && stream.getTracks().forEach(t => t.stop()); ui.state.textContent = msg; ui.btns.replaceChildren(h("button", { type: "button", cls: "c-btn", onclick: () => { ui.close(); callOn = null; } }, "✕")); if (id) api(`/api/s/calls/${id}/end`, { body: {} }).catch(() => {}); };
+    try {
+      stream = await media(kind); ui.local.srcObject = stream;
+      pc = new RTCPeerConnection(await getIce());
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+      await pc.setLocalDescription(await pc.createOffer()); await gathered(pc);
+      id = (await api("/api/s/calls", { body: { to: user.username, kind, offer: pc.localDescription.sdp } })).id;
+    } catch (e) { return fail(e.message); }
+    ui.state.textContent = "Ringing…";
+    const call = inCall(ui, pc, stream, id, kind, true), finish = call.finish;
+    // Wait for the answer.
+    const wait = setInterval(async () => {
+      const c = await api("/api/s/calls/" + id).catch(() => null);
+      if (!c || !callOn) return clearInterval(wait);
+      if (c.status === "accepted" && c.answer) {
+        clearInterval(wait); ui.state.textContent = "Connecting…";
+        try { await pc.setRemoteDescription({ type: "answer", sdp: c.answer }); } catch { return finish("Could not connect."); }
+        call.live(); // shows the in-call buttons
+      } else if (c.status !== "ringing") { clearInterval(wait); finish(c.status === "declined" ? user.name + " declined the call" : c.status === "missed" ? "No answer" : "Call ended", false); }
+    }, 1500);
+  }
+  async function incoming(c) {
+    if (callOn) return;
+    callOn = {};
+    const ui = callScreen(c.user, c.kind, c.kind === "video" ? "Video call…" : "Voice call…");
+    ui.box.classList.add("ring");
+    const stop = ringTone();
+    const accept = h("button", { type: "button", cls: "c-btn ok", "aria-label": "Answer" }, c.kind === "video" ? "📹" : "📞");
+    const decline = h("button", { type: "button", cls: "c-btn end", "aria-label": "Decline" }, "📞");
+    const gone = setInterval(async () => { const s = await api("/api/s/calls/" + c.id).catch(() => null); if (s && s.status !== "ringing" && ui.box.classList.contains("ring")) { clearInterval(gone); stop(); ui.close(); callOn = null; } }, 2000);
+    decline.onclick = () => { clearInterval(gone); stop(); api(`/api/s/calls/${c.id}/end`, { body: {} }).catch(() => {}); ui.close(); callOn = null; };
+    accept.onclick = async () => {
+      clearInterval(gone); stop(); ui.box.classList.remove("ring"); ui.state.textContent = "Connecting…"; ui.btns.replaceChildren();
+      let stream, pc;
+      try {
+        stream = await media(c.kind); ui.local.srcObject = stream;
+        pc = new RTCPeerConnection(await getIce());
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+        inCall(ui, pc, stream, c.id, c.kind);
+        await pc.setRemoteDescription({ type: "offer", sdp: c.offer });
+        await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc);
+        await api(`/api/s/calls/${c.id}/answer`, { body: { answer: pc.localDescription.sdp } });
+      } catch (e) { callOn && callOn.finish ? callOn.finish(e.message) : (ui.close(), callOn = null); }
+    };
+    ui.btns.append(decline, accept);
+  }
+  // Is someone calling me? Checked every 4 seconds while the page is open.
+  setInterval(async () => {
+    if (!tok || !me || callOn || document.hidden) return;
+    const d = await api("/api/s/calls/incoming").catch(() => null);
+    if (d && d.call) incoming(d.call);
+  }, 4000);
 
   // ---------- badges (unread messages and alerts) ----------
   async function loadMe() {

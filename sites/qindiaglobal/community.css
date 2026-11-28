@@ -186,3 +186,24 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .player{display:block;width:100%;max-height:70vh;aspect-ratio:16/9;background:#000}
 .cm h1.vtitle{font-size:19px;margin:10px 0 4px;overflow-wrap:anywhere}
 .watchlink{display:block;padding:6px 14px;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}
+/* Voice and video calls */
+.chat .head .callbtn{flex:none;padding:8px 10px;font-size:18px;line-height:1}
+.call{position:fixed;inset:0;z-index:30;background:#0b141a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(24px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+.call .c-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#0b141a;display:none}
+.call.video.live .c-remote{display:block}
+.call.audio .c-remote{display:block;width:1px;height:1px;opacity:0}
+.call .c-local{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top));width:96px;height:128px;object-fit:cover;border-radius:12px;border:2px solid rgba(255,255,255,.6);background:#000;z-index:2}
+.call.audio .c-local{display:none}
+.call .c-who{position:relative;z-index:1;text-align:center;margin-top:40px}
+.call.video.live .c-who{margin-top:0;text-shadow:0 1px 4px #000}
+.call.video.live .c-who .av{display:none}
+.call .c-who h2{color:#fff;margin:12px 0 4px;font-size:24px}
+.call .c-state{margin:0;color:rgba(255,255,255,.8)}
+.call.ring .c-who .av{animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.6)}50%{box-shadow:0 0 0 18px rgba(37,211,102,0)}}
+.call .c-btns{position:relative;z-index:2;display:flex;gap:28px}
+.c-btn{width:64px;height:64px;border-radius:50%;border:0;font-size:26px;background:rgba(255,255,255,.18);color:#fff;cursor:pointer}
+.c-btn.off{background:#fff;filter:grayscale(1)}
+.c-btn.end{background:#e53935;transform:rotate(135deg)}
+.c-btn.ok{background:#25d366}
+.call.ring .c-local{display:none}

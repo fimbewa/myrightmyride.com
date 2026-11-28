@@ -83,9 +83,17 @@
       <div class="stat"><b id="cGroupMsgsToday">0</b>group messages today</div>
       <div class="stat"><b id="cStories">0</b>Status updates now</div>
       <div class="stat"><b id="cPages">0</b>Pages</div>
+      <div class="stat"><b id="cCalls">0</b>calls today</div>
       <div class="stat"><b id="cDisk">0</b>photos MB / free GB</div>
     </div>
     <label style="display:flex;gap:10px;align-items:center;margin:8px 0 14px"><input type="checkbox" id="cPhotoApproval" style="width:auto"> Photos wait for my approval before everyone sees them (recommended while the community is small)</label>
+    <details style="margin:0 0 14px"><summary>Calls: relay server (optional)</summary>
+      <p style="font-size:14px">Voice and video calls go directly between the two phones. On some mobile networks that is not possible, and those calls fail. A TURN relay server fixes this. Running one costs money, so it is optional. If you get one, paste its details here.</p>
+      <input id="turnUrl" placeholder="turn:turn.example.com:3478" autocomplete="off">
+      <input id="turnUser" placeholder="Username" autocomplete="off">
+      <input id="turnPass" type="password" placeholder="Password (leave empty to keep the saved one)" autocomplete="new-password">
+      <button class="small-btn" type="button" id="turnSave">Save relay</button> <span id="turnMsg" style="font-size:14px"></span>
+    </details>
     <h3>Waiting for you</h3>
     <div id="cPending"></div>
     <h3>Reports</h3>
@@ -194,7 +202,7 @@ async function load() {
   const names = {}; (window.QI_LANGS || []).forEach(([c, n]) => { names[c] = n; });
   fill($("langs"), d.byLang, r => [names[r.lang] || r.lang || "-", String(r.n)]);
   loadPosts().catch(() => {});
-  loadCommunity().catch(() => {});
+  loadCommunity().catch(() => {}); loadTurn();
   loadLegal().catch(() => {});
   loadOauth().catch(() => {});
 }
@@ -230,6 +238,14 @@ $("legalForm").onsubmit = async e => {
   catch (err) { msg.textContent = err.message; msg.classList.add("bad"); }
 };
 // ---------- community moderation ----------
+// Calls: optional TURN relay
+async function loadTurn() { try { const t = await (await api("/api/admin/turn")).json(); $("turnUrl").value = t.url || ""; $("turnUser").value = t.username || ""; $("turnMsg").textContent = t.set ? "A relay is saved." : "No relay (calls use direct connections only)."; } catch {} }
+$("turnSave").onclick = async () => {
+  try {
+    const d = await (await api("/api/admin/turn", { method: "POST", body: JSON.stringify({ url: $("turnUrl").value, username: $("turnUser").value, credential: $("turnPass").value }) })).json();
+    $("turnPass").value = ""; $("turnMsg").textContent = d.set ? "Saved." : "Relay removed.";
+  } catch (e) { $("turnMsg").textContent = e.message; }
+};
 const cAct = async (body) => { await api("/api/admin/community", { method: "POST", body: JSON.stringify(body) }); loadCommunity(); };
 function cItem(meta, who, text, photo, buttons) {
   const it = el("div", "item");
@@ -254,7 +270,7 @@ async function loadCommunity() {
   const q = $("cSearch").value.trim();
   const d = await (await api("/api/admin/community?q=" + encodeURIComponent(q))).json();
   $("cUsers").textContent = d.users; $("cUsersToday").textContent = d.usersToday; $("cPosts").textContent = d.posts; $("cPostsToday").textContent = d.postsToday;
-  $("cMsgsToday").textContent = d.messagesToday; $("cGroups").textContent = d.groups || 0; $("cGroupMsgsToday").textContent = d.groupMessagesToday || 0; $("cStories").textContent = d.storiesLive || 0; $("cPages").textContent = d.pages || 0; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
+  $("cMsgsToday").textContent = d.messagesToday; $("cGroups").textContent = d.groups || 0; $("cGroupMsgsToday").textContent = d.groupMessagesToday || 0; $("cStories").textContent = d.storiesLive || 0; $("cPages").textContent = d.pages || 0; $("cCalls").textContent = d.callsToday || 0; $("cDisk").textContent = d.photoMB + " / " + d.freeGB; $("cPhotoApproval").checked = d.photoApproval;
   const pend = $("cPending"); pend.replaceChildren();
   d.pendingPosts.forEach(p => pend.append(cItem("Post · " + when(p.at) + (p.reports ? " · " + p.reports + " report(s)" : ""), p.username, p.text, p.photo,
     [["Approve", { action: "post-ok", id: p.id }], ["Hide", { action: "post-hide", id: p.id }], ["Delete", { action: "post-delete", id: p.id }, true]])));
