@@ -172,6 +172,7 @@
   }
   async function oauthPage(code) {
     let d; try { d = await api("/api/s/oauth/claim", { body: { code }, noLogout: true }); } catch (e) { loginPage(); return alertNote(e.message); }
+    if (d.need2fa) return twoStepPage(d, () => go(afterLogin("#/")));
     if (d.token) { setToken(d.token); await loadMe(); return go(afterLogin("#/")); }
     const m = msgBox();
     const f = h("form", { cls: "card" },
@@ -195,6 +196,33 @@
     };
     show(f);
   }
+  // Two-step login: the password was right; now the 6-digit code from the authenticator app (or a backup code).
+  function twoStepPage(d, then) {
+    const m = msgBox();
+    const f = h("form", { cls: "card" },
+      h("h1", { text: "Two-step login" }),
+      h("p", { cls: "muted", text: "Open your authenticator app (for example Google Authenticator) and type the 6 numbers shown for Qindiaglobal (@" + d.username + ")." }),
+      h("input", { name: "code", placeholder: "6-digit code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: 9, required: true }),
+      h("button", { cls: "btn" }, "Log in"), m,
+      h("p", { cls: "muted", text: "Phone lost or changed? Type one of your backup codes (like abcd-2345) instead. Lost those too? Write to the site owner using the form on the home page." }));
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Please wait…", true);
+      try {
+        const r = await api("/api/s/login/2fa", { body: { ticket: d.ticket, code: f.code.value }, noLogout: true });
+        setToken(r.token); await loadMe();
+        await then(r);
+        if (r.usedBackup) alertNote("You used a backup code. " + r.backupsLeft + " left. You can make new ones in Settings.");
+      } catch (err) { say(m, err.message); if (err.status === 410) setTimeout(() => go("#/login"), 1500); }
+    };
+    show(f); f.code.focus();
+  }
+  function showBackup(codes, then) {
+    show(h("div", { cls: "card" },
+      h("h1", { text: "Save your backup codes" }),
+      h("p", { text: "If you lose your phone, each of these codes lets you log in once instead of the app code. Write them down or take a screenshot and keep it private. They are shown only once." }),
+      h("p", { cls: "code", style: "font-size:17px;line-height:1.7", text: codes.join("   ") }),
+      h("p", {}, h("button", { cls: "btn", onclick: then }, "I have saved them"))));
+  }
   function loginPage() {
     const m = msgBox();
     const f = h("form", { cls: "card" },
@@ -205,7 +233,7 @@
       h("p", { cls: "muted" }, "New here? ", h("a", { href: "#/signup" }, "Create a free account"), " · ", h("a", { href: "#/recover" }, "Forgot password?")));
     f.onsubmit = async e => {
       e.preventDefault(); say(m, "Please wait…", true);
-      try { const d = await api("/api/s/login", { body: { username: f.username.value, password: f.password.value }, noLogout: true }); setToken(d.token); await loadMe(); go(afterLogin("#/")); }
+      try { const d = await api("/api/s/login", { body: { username: f.username.value, password: f.password.value }, noLogout: true }); if (d.need2fa) return twoStepPage(d, () => go(afterLogin("#/"))); setToken(d.token); await loadMe(); go(afterLogin("#/")); }
       catch (err) { say(m, err.message); }
     };
     show(f);
@@ -241,7 +269,7 @@
   // or the recovery code from sign-up. The username or the saved email both work.
   async function recoverPage() {
     const info = await api("/api/s/reset/info").catch(() => ({}));
-    const done = d => { setToken(d.token); loadMe().then(() => showRecovery(d.recovery, () => go("#/"))); };
+    const done = d => { if (d.need2fa) return twoStepPage(d, r => showRecovery(r.recovery, () => go("#/"))); setToken(d.token); loadMe().then(() => showRecovery(d.recovery, () => go("#/"))); };
     const who = h("input", { name: "who", placeholder: "Username or email", autocomplete: "username", autocapitalize: "none", required: true });
     const tip = h("p", { cls: "muted", style: "font-size:13px;margin:4px 0 0", text: "Your username is on your profile, after the @ sign (for example @ravi_patil)." });
     // 1. code by email
@@ -581,6 +609,31 @@
       me.hasPassword && h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true }),
       h("button", { cls: "sbtn dark" }, "Make a new recovery code"), rcMsg);
     rf.onsubmit = async e => { e.preventDefault(); try { const d = await api("/api/s/recovery/new", { body: { password: rf.password ? rf.password.value : "" } }); showRecovery(d.recovery, () => go("#/me/settings")); } catch (err) { say(rcMsg, err.message); } };
+    // Two-step login with an authenticator app
+    const tMsg = msgBox(), tBox = h("div", {});
+    const codeInput = ph => h("input", { name: "code", placeholder: ph, inputmode: "numeric", autocomplete: "one-time-code", maxlength: 9, required: true });
+    if (me.tfa) {
+      const off = h("form", {}, codeInput("Code from the app, or a backup code"), h("button", { cls: "sbtn" }, "Turn off two-step login"));
+      off.onsubmit = async e => { e.preventDefault(); try { await api("/api/s/2fa/disable", { body: { code: off.code.value } }); settingsPage(); } catch (err) { say(tMsg, err.message); } };
+      const nb = h("form", {}, codeInput("Code from the app"), h("button", { cls: "sbtn dark" }, "Make new backup codes"));
+      nb.onsubmit = async e => { e.preventDefault(); try { const d = await api("/api/s/2fa/backup", { body: { code: nb.code.value } }); showBackup(d.backup, () => go("#/me/settings")); } catch (err) { say(tMsg, err.message); } };
+      tBox.append(h("p", {}, h("b", { text: "ON. " }), "Logging in needs your password and the code from your authenticator app. Backup codes left: " + me.backupsLeft + "."), nb, off);
+    } else {
+      const start = h("button", { cls: "sbtn dark", type: "button" }, "Turn on two-step login");
+      tBox.append(h("p", { cls: "muted", text: "Extra safety: even someone who learns your password cannot log in without your phone. You need a free authenticator app, such as Google Authenticator (Play Store)." }), start);
+      start.onclick = async () => {
+        try {
+          const d = await api("/api/s/2fa/setup", { body: {} });
+          const ef = h("form", {}, codeInput("6-digit code from the app"), h("button", { cls: "sbtn dark" }, "Check code and turn on"));
+          ef.onsubmit = async e => { e.preventDefault(); try { const r = await api("/api/s/2fa/enable", { body: { code: ef.code.value } }); await loadMe(); showBackup(r.backup, () => go("#/me/settings")); } catch (err) { say(tMsg, err.message); } };
+          tBox.replaceChildren(
+            h("p", {}, h("b", { text: "1. " }), "On this phone: tap ", h("a", { href: d.uri }, "Add to authenticator app"), ". On a computer: scan this picture with the app."),
+            h("img", { src: d.qr, alt: "QR code for the authenticator app", style: "width:180px;height:180px;display:block;margin:6px 0" }),
+            h("p", { cls: "muted", style: "font-size:13px" }, "Or in the app choose \"Enter a setup key\" and type: ", h("b", { style: "word-break:break-all", text: d.secret.replace(/(.{4})/g, "$1 ").trim() })),
+            h("p", {}, h("b", { text: "2. " }), "Type the 6 numbers the app now shows for Qindiaglobal:"), ef);
+        } catch (err) { say(tMsg, err.message); }
+      };
+    }
     const dmsg = msgBox();
     const df = h("form", {}, h("p", { cls: "muted", text: "This removes your profile, posts, comments, likes, photos and the messages you sent. It cannot be undone." }),
       me.hasPassword ? h("input", { name: "password", type: "password", placeholder: "Your password", autocomplete: "current-password", required: true })
@@ -602,6 +655,7 @@
       h("div", { cls: "card" }, h("label", { text: "Password" }), pf),
       h("div", { cls: "card" }, h("label", { text: "Email for password codes" }), emBox, emMsg),
       h("div", { cls: "card" }, h("label", { text: "Recovery code" }), rf),
+      h("div", { cls: "card" }, h("label", { text: "Two-step login" }), tBox, tMsg),
       (me.linked || []).length > 0 && h("div", { cls: "card" }, h("label", { text: "Signed in with" }), ...(me.linked || []).map(p => {
         const b = h("button", { cls: "sbtn" }, "Remove");
         b.onclick = async () => { try { await api("/api/s/oauth/unlink", { body: { provider: p } }); settingsPage(); } catch (e) { alertNote(e.message); } };

@@ -138,9 +138,33 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     const result = ownerPassword.checkOwner(String((req.body || {}).password || ""));
     if (result === "unset") return bad(res, "No owner password is set yet. Use \"Set a new password\" below.", 503);
     if (result !== "ok") return bad(res, "Wrong password.", 401);
-    const t = crypto.randomBytes(24).toString("hex");
-    db.prepare("INSERT INTO admin_sessions(token, created_at) VALUES(?,?)").run(t, now());
-    res.json({ token: t });
+    if (ownerTfa()) { const ticket = crypto.randomBytes(24).toString("hex"); ownerTickets.set(ticket, { until: now() + 10 * 60_000, tries: 0 }); return res.json({ need2fa: true, ticket }); }
+    res.json({ token: newAdminSession() });
+  });
+  // ---------- optional two-step login for the owner (authenticator app + backup codes) ----------
+  // Forgetting the phone and the backup codes is solved by the GitHub reset below, which also turns this off.
+  db.exec("CREATE TABLE IF NOT EXISTS owner_2fa (id INTEGER PRIMARY KEY CHECK (id = 1), secret TEXT NOT NULL, backup TEXT NOT NULL, last INTEGER NOT NULL DEFAULT 0)");
+  const totp = require("./totp");
+  const ownerTfa = () => db.prepare("SELECT * FROM owner_2fa WHERE id = 1").get();
+  const ownerTickets = new Map();
+  let ownerPending = null;
+  function newAdminSession() { const t = crypto.randomBytes(24).toString("hex"); db.prepare("INSERT INTO admin_sessions(token, created_at) VALUES(?,?)").run(t, now()); return t; }
+  function ownerSecondStep(typed) {
+    const row = ownerTfa(); if (!row) return null;
+    const step = totp.check(row.secret, typed, row.last);
+    if (step) { db.prepare("UPDATE owner_2fa SET last = ? WHERE id = 1").run(step); return "app"; }
+    const left = totp.useBackup(JSON.parse(row.backup), typed);
+    if (left) { db.prepare("UPDATE owner_2fa SET backup = ? WHERE id = 1").run(JSON.stringify(left)); return "backup"; }
+    return null;
+  }
+  r.post("/api/admin/login/2fa", (req, res) => {
+    const b = req.body || {}, key = String(b.ticket || ""), t = ownerTickets.get(key);
+    if (limited(req, "login2fa", 20, 15 * 60_000)) return bad(res, "Too many tries. Wait 15 minutes.", 429);
+    if (!t || t.until < now()) return bad(res, "This took too long. Please log in again.", 410);
+    const how = ownerSecondStep(b.code);
+    if (!how) { if (++t.tries >= 5) ownerTickets.delete(key); return bad(res, t.tries >= 5 ? "Wrong code too many times. Please log in again." : "Wrong code. Type the 6 numbers your authenticator app shows now, or a backup code.", 401); }
+    ownerTickets.delete(key);
+    res.json({ token: newAdminSession(), usedBackup: how === "backup", backupsLeft: JSON.parse(ownerTfa().backup).length });
   });
 
   // Password reset proven through GitHub: the page shows a one-time code; the owner creates a file named after it
@@ -166,6 +190,7 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     if (!require("fs").existsSync(path.join(RESET_DIR, code))) return res.status(409).json({ error: "waiting", waiting: true });
     if (pw.length < 8) return bad(res, "The new password must be at least 8 characters.");
     ownerPassword.setOwnerPassword(pw);
+    db.prepare("DELETE FROM owner_2fa").run(); // proved through GitHub: two-step login is turned off so the owner can get in
     db.prepare("UPDATE owner_resets SET used = 1 WHERE code = ?").run(code);
     const t = crypto.randomBytes(24).toString("hex");
     db.prepare("INSERT INTO admin_sessions(token, created_at) VALUES(?,?)").run(t, now());
@@ -177,6 +202,37 @@ CREATE TABLE IF NOT EXISTS q_bans (ip_hash TEXT PRIMARY KEY, created_at INTEGER 
     if (!row || now() - row.created_at > 7 * 24 * 3600_000) return bad(res, "Please log in again.", 401);
     next();
   }
+  r.get("/api/admin/2fa", owner, (req, res) => { const row = ownerTfa(); res.json({ on: !!row, backupsLeft: row ? JSON.parse(row.backup).length : 0 }); });
+  r.post("/api/admin/2fa/setup", owner, async (req, res) => {
+    if (ownerTfa()) return bad(res, "Two-step login is already on.");
+    const secret = totp.newSecret(), uri = totp.otpauth(secret, "owner");
+    ownerPending = { secret, until: now() + 30 * 60_000 };
+    res.json({ secret, uri, qr: await require("qrcode").toDataURL(uri, { margin: 1, width: 220 }) });
+  });
+  r.post("/api/admin/2fa/enable", owner, (req, res) => {
+    if (!ownerPending || ownerPending.until < now()) return bad(res, "This took too long. Please start again.", 410);
+    const step = totp.check(ownerPending.secret, (req.body || {}).code);
+    if (!step) return bad(res, "Wrong code. Type the 6 numbers the app shows for Qindiaglobal now.", 401);
+    const { codes, hashes } = totp.newBackupCodes();
+    db.prepare("INSERT OR REPLACE INTO owner_2fa(id, secret, backup, last) VALUES(1,?,?,?)").run(ownerPending.secret, JSON.stringify(hashes), step);
+    ownerPending = null;
+    res.json({ ok: true, backup: codes });
+  });
+  r.post("/api/admin/2fa/disable", owner, (req, res) => {
+    if (!ownerTfa()) return res.json({ ok: true });
+    if (limited(req, "tfa-off", 10, 3600_000)) return bad(res, "Too many tries. Wait an hour.", 429);
+    if (!ownerSecondStep((req.body || {}).code)) return bad(res, "Wrong code. Type the 6 numbers from your authenticator app, or a backup code.", 401);
+    db.prepare("DELETE FROM owner_2fa").run();
+    res.json({ ok: true });
+  });
+  r.post("/api/admin/2fa/backup", owner, (req, res) => {
+    const row = ownerTfa(); if (!row) return bad(res, "Two-step login is off.");
+    if (limited(req, "tfa-off", 10, 3600_000)) return bad(res, "Too many tries. Wait an hour.", 429);
+    if (!totp.check(row.secret, (req.body || {}).code, row.last)) return bad(res, "Wrong code. Type the 6 numbers from your authenticator app.", 401);
+    const { codes, hashes } = totp.newBackupCodes();
+    db.prepare("UPDATE owner_2fa SET backup = ? WHERE id = 1").run(JSON.stringify(hashes));
+    res.json({ backup: codes });
+  });
   r.get("/api/admin/summary", owner, (req, res) => {
     const day = now() - 24 * 3600_000;
     res.json({

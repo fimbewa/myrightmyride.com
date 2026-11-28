@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS s_codes (
   user_id INTEGER NOT NULL REFERENCES s_users(id) ON DELETE CASCADE, purpose TEXT NOT NULL, -- reset | verify
   email TEXT NOT NULL, salt TEXT NOT NULL, code_hash TEXT NOT NULL, tries INTEGER NOT NULL DEFAULT 0,
   expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (user_id, purpose))`);
+  // Added later: optional two-step login with an authenticator app (secret, scrambled backup codes, last used time step).
+  for (const col of ["tfa_secret TEXT", "tfa_backup TEXT", "tfa_last INTEGER NOT NULL DEFAULT 0"]) if (!db.prepare("PRAGMA table_info(s_users)").all().some(c => c.name === col.split(" ")[0])) db.exec(`ALTER TABLE s_users ADD COLUMN ${col}`);
   const MEDIA = process.env.MEDIA_DIR || path.join(path.dirname(db.name), "media");
   fs.mkdirSync(MEDIA, { recursive: true });
   // IT Intermediary Rules 2021, rule 3(1)(g)/(h): what the owner removes, and the sign-up details of closed
@@ -190,7 +192,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
     const u = findAccount(b.username).user;
     if (!u || !same(scrypt(String(b.password || ""), u.pass_salt), u.pass_hash)) return bad(res, "Wrong username or password.", 401);
     if (u.status === "banned") return bad(res, "This account has been stopped by the site owner for breaking the rules.", 403);
-    res.json({ token: newSession(u.id), user: { username: u.username, name: u.name } });
+    res.json(finishLogin(u, {}));
   });
 
   // Find an account by username (with or without @) or by its saved email. Spaces and capitals do not matter.
@@ -225,7 +227,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
     if (String(b.password || "").length < 8) return bad(res, "The new password must be at least 8 characters.");
     if (u.status === "banned") return bad(res, "This account has been stopped by the site owner.", 403);
     const rec = setNewPassword(u, String(b.password));
-    res.json({ token: newSession(u.id), recovery: rec, user: { username: u.username, name: u.name } });
+    res.json(finishLogin(u, { recovery: rec }));
   });
 
   // ---------- email codes (password reset by email, and checking a new email) ----------
@@ -287,7 +289,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
     if (String(b.password || "").length < 8) return bad(res, "The new password must be at least 8 characters.");
     if (u.status === "banned") return bad(res, "This account has been stopped by the site owner.", 403);
     const rec = setNewPassword(u, String(b.password));
-    res.json({ token: newSession(u.id), recovery: rec, user: { username: u.username, name: u.name } });
+    res.json(finishLogin(u, { recovery: rec }));
   });
 
   // A logged-in member adds (or changes) their email: we send a code to it first, so only a working email of theirs is saved.
@@ -357,7 +359,79 @@ CREATE TABLE IF NOT EXISTS s_codes (
     if (!u) return bad(res, "Not found.", 404);
     const abc = "abcdefghjkmnpqrstuvwxyz23456789", pw = Array.from(crypto.randomBytes(10), x => abc[x % abc.length]).join("");
     const rec = setNewPassword(u, pw);
+    db.prepare("UPDATE s_users SET tfa_secret = NULL, tfa_backup = NULL, tfa_last = 0 WHERE id = ?").run(u.id); // the owner checked who it is
     res.json({ username: u.username, password: pw, recovery: rec });
+  });
+
+  // ---------- two-step login (authenticator app + backup codes) ----------
+  const totp = require("./totp");
+  const tickets = new Map(); // ticket -> { userId, extra, until, tries }: password was right, the app code is still needed
+  setInterval(() => { const t = now(); for (const [k, v] of tickets) if (v.until < t) tickets.delete(k); }, 600_000).unref();
+  // After a right password (or reset, or Google/Facebook): log in at once, or ask for the 6-digit app code first.
+  function finishLogin(u, extra) {
+    if (!u.tfa_secret) return { token: newSession(u.id), ...extra, user: { username: u.username, name: u.name } };
+    const ticket = crypto.randomBytes(24).toString("hex");
+    tickets.set(ticket, { userId: u.id, extra, until: now() + 10 * 60_000, tries: 0 });
+    return { need2fa: true, ticket, username: u.username };
+  }
+  // Checks an app code or a backup code for a member; uses it up. Returns "app", "backup" or null.
+  function secondStep(u, typed) {
+    const step = totp.check(u.tfa_secret, typed, u.tfa_last);
+    if (step) { db.prepare("UPDATE s_users SET tfa_last = ? WHERE id = ?").run(step, u.id); return "app"; }
+    const left = totp.useBackup(JSON.parse(u.tfa_backup || "[]"), typed);
+    if (left) { db.prepare("UPDATE s_users SET tfa_backup = ? WHERE id = ?").run(JSON.stringify(left), u.id); return "backup"; }
+    return null;
+  }
+  r.post("/api/s/login/2fa", (req, res) => {
+    const b = req.body || {}, t = tickets.get(String(b.ticket || ""));
+    if (limited(req, "login2fa", 30, 15 * 60_000)) return bad(res, "Too many tries. Please wait 15 minutes.", 429);
+    if (!t || t.until < now()) return bad(res, "This took too long. Please log in again.", 410);
+    const u = db.prepare("SELECT * FROM s_users WHERE id = ?").get(t.userId);
+    if (!u || u.status === "banned") { tickets.delete(String(b.ticket)); return bad(res, "This account has been stopped by the site owner.", 403); }
+    const how = secondStep(u, b.code);
+    if (!how) {
+      if (++t.tries >= 5) { tickets.delete(String(b.ticket)); return bad(res, "Wrong code too many times. Please log in again.", 401); }
+      return bad(res, "Wrong code. Type the 6 numbers your authenticator app shows now, or one of your backup codes.", 401);
+    }
+    tickets.delete(String(b.ticket));
+    const backupsLeft = JSON.parse(db.prepare("SELECT tfa_backup FROM s_users WHERE id = ?").get(u.id).tfa_backup || "[]").length;
+    res.json({ token: newSession(u.id), ...t.extra, user: { username: u.username, name: u.name }, usedBackup: how === "backup", backupsLeft });
+  });
+  const pending2fa = new Map(); // user id -> { secret, until }: shown in Settings, saved once the member types a right code
+  r.post("/api/s/2fa/setup", login, async (req, res) => {
+    const me = req.me;
+    if (me.tfa_secret) return bad(res, "Two-step login is already on.");
+    const secret = totp.newSecret(), uri = totp.otpauth(secret, "@" + me.username);
+    pending2fa.set(me.id, { secret, until: now() + 30 * 60_000 });
+    res.json({ secret, uri, qr: await require("qrcode").toDataURL(uri, { margin: 1, width: 220 }) });
+  });
+  r.post("/api/s/2fa/enable", login, (req, res) => {
+    const me = req.me, p = pending2fa.get(me.id);
+    if (!p || p.until < now()) return bad(res, "This took too long. Please start again.", 410);
+    const step = totp.check(p.secret, (req.body || {}).code);
+    if (!step) return bad(res, "Wrong code. Type the 6 numbers the app shows for Qindiaglobal now (they change every 30 seconds).", 401);
+    const { codes, hashes } = totp.newBackupCodes();
+    db.prepare("UPDATE s_users SET tfa_secret = ?, tfa_backup = ?, tfa_last = ? WHERE id = ?").run(p.secret, JSON.stringify(hashes), step, me.id);
+    db.prepare("DELETE FROM s_sessions WHERE user_id = ? AND token_hash != ?").run(me.id, me.tokenHash); // other phones log in again
+    pending2fa.delete(me.id);
+    res.json({ ok: true, backup: codes });
+  });
+  r.post("/api/s/2fa/disable", login, (req, res) => {
+    const me = req.me;
+    if (!me.tfa_secret) return res.json({ ok: true });
+    if (limited(req, "tfa-off", 10, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
+    if (!secondStep(me, (req.body || {}).code)) return bad(res, "Wrong code. Type the 6 numbers from your authenticator app, or a backup code.", 401);
+    db.prepare("UPDATE s_users SET tfa_secret = NULL, tfa_backup = NULL, tfa_last = 0 WHERE id = ?").run(me.id);
+    res.json({ ok: true });
+  });
+  r.post("/api/s/2fa/backup", login, (req, res) => {
+    const me = req.me;
+    if (!me.tfa_secret) return bad(res, "Two-step login is off.");
+    if (limited(req, "tfa-off", 10, 3600_000)) return bad(res, "Too many tries. Please wait an hour.", 429);
+    if (!totp.check(me.tfa_secret, (req.body || {}).code, me.tfa_last)) return bad(res, "Wrong code. Type the 6 numbers from your authenticator app.", 401);
+    const { codes, hashes } = totp.newBackupCodes();
+    db.prepare("UPDATE s_users SET tfa_backup = ? WHERE id = ?").run(JSON.stringify(hashes), me.id);
+    res.json({ backup: codes });
   });
 
   r.post("/api/s/logout", login, (req, res) => { db.prepare("DELETE FROM s_sessions WHERE token_hash = ?").run(req.me.tokenHash); res.json({ ok: true }); });
@@ -368,7 +442,8 @@ CREATE TABLE IF NOT EXISTS s_codes (
       ...pubUser(me), bio: me.bio || "", city: me.city || "", dm: me.dm,
       notifs: db.prepare("SELECT COUNT(*) AS n FROM s_notifs WHERE user_id = ? AND read = 0").get(me.id).n,
       messages: unreadChats(me.id) + ext.unreadGroups(me.id),
-      rulesDue: rulesDue(me), hasPassword: !!me.pass_set, email: me.email || "", emailOn: mailReady(mailCfg()), media: memberMedia(),
+      rulesDue: rulesDue(me), hasPassword: !!me.pass_set, email: me.email || "", emailOn: mailReady(mailCfg()),
+      tfa: !!me.tfa_secret, backupsLeft: me.tfa_secret ? JSON.parse(me.tfa_backup || "[]").length : 0, media: memberMedia(),
       linked: db.prepare("SELECT provider FROM s_identities WHERE user_id = ?").all(me.id).map(x => x.provider),
     });
   });
@@ -858,7 +933,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
         if (x.kind === "message") { const m = db.prepare("SELECT m.*, u.username FROM s_messages m JOIN s_users u ON u.id = m.sender_id WHERE m.id = ? AND m.reported = 1").get(x.target_id); item = m && { username: m.username, text: m.text, photo: m.photo && "/media/" + m.photo }; }
         return { kind: x.kind, id: x.target_id, count: x.n, at: x.at, reasons: x.reasons, item };
       }),
-      people: db.prepare(`SELECT id, username, name, city, status, reports, created_at, last_seen,
+      people: db.prepare(`SELECT id, username, name, city, status, reports, created_at, last_seen, tfa_secret IS NOT NULL AS tfa,
           (SELECT COUNT(*) FROM s_posts WHERE user_id = s_users.id) AS posts FROM s_users
           WHERE (? = '' OR username LIKE ? OR lower(name) LIKE ?) ORDER BY ${q ? "id DESC" : "reports DESC, id DESC"} LIMIT 300`).all(q, q + "%", "%" + q + "%"),
     });
@@ -1000,7 +1075,12 @@ CREATE TABLE IF NOT EXISTS s_codes (
   r.post("/api/s/oauth/claim", (req, res) => {
     const code = String((req.body || {}).code || ""), h = handoffs.get(code);
     if (!h || h.until < now()) return bad(res, "This sign-in link has expired. Please try again.", 410);
-    if (h.token) { handoffs.delete(code); return res.json({ token: h.token }); }
+    if (h.token) {
+      handoffs.delete(code);
+      const u = db.prepare("SELECT u.* FROM s_sessions s JOIN s_users u ON u.id = s.user_id WHERE s.token_hash = ?").get(sha(h.token));
+      if (u && u.tfa_secret) { db.prepare("DELETE FROM s_sessions WHERE token_hash = ?").run(sha(h.token)); return res.json(finishLogin(u, {})); }
+      return res.json({ token: h.token });
+    }
     const n = h.pending.name && !isBad(h.pending.name) ? h.pending.name : "";
     res.json({ pending: { provider: PROVIDERS[h.pending.p].label, name: n, username: suggest(n) } });
   });
