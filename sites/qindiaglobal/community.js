@@ -1,6 +1,6 @@
 // Q India Community: the page at qindiaglobal.com/community. One page; the part after # picks the screen:
 // #/ feed · #/new · #/p/<id> post · #/u/<username> profile · #/search · #/chats · #/chat/<username> · #/notifs · #/me · #/login · #/signup · #/recover
-// #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
+// #/reels (short videos) · #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
 (function () {
   "use strict";
   const view = document.getElementById("view");
@@ -270,31 +270,43 @@
       p.status === "pending" && h("p", { cls: "wait", text: "Only you can see this for now. The site owner checks photos and some posts before everyone sees them." }),
       p.text && h("div", { cls: "tx" }, richText(p.text)),
       p.photo && h("img", { cls: "pic", src: p.photo, alt: "Photo shared by " + p.user.name, loading: "lazy" }),
+      p.video && videoEl(p.video, { cls: "pic vid" }),
       h("div", { cls: "acts" }, likeBtn, full ? h("span", { cls: "muted", style: "flex:1;text-align:center;padding:8px", text: "💬 " + p.comments }) : h("a", { href: "#/p/" + p.id }, "💬 " + (p.comments || "") + " Comment"), share));
     return card;
   }
   function composer(after) {
-    const m = msgBox(); let photo = null, file = null;
+    const m = msgBox(); let photo = null, file = null, video = null;
     const prev = h("div", { cls: "prev", hidden: true });
     const f = h("form", { cls: "card compose" },
       h("div", { cls: "row" }, me && avatar(me, "sm"), h("b", { text: "Share with the community" })),
       h("textarea", { name: "text", maxlength: 5000, placeholder: "What's happening? Share a good queue you saw, a tip, or a photo." }), prev,
       h("div", { cls: "row" }, photoPicker(async fl => {
-        file = fl; photo = null; prev.hidden = false; prev.replaceChildren(h("p", { cls: "muted", text: "Preparing photo…" }));
+        file = fl; photo = null; video = null; prev.hidden = false; prev.replaceChildren(h("p", { cls: "muted", text: "Preparing photo…" }));
         try {
           photo = await uploadPhoto(fl);
           if (file !== fl) return;
           const rm = h("button", { type: "button", cls: "sbtn" }, "✕ Remove"); rm.onclick = () => { photo = null; file = null; prev.hidden = true; prev.replaceChildren(); };
           prev.replaceChildren(h("img", { src: URL.createObjectURL(fl), alt: "" }), rm);
         } catch (e) { prev.replaceChildren(h("p", { cls: "msg bad", text: e.message })); photo = null; }
+      }), videoPicker(async fl => {
+        file = fl; photo = null; video = null; prev.hidden = false;
+        const status = h("p", { cls: "muted", text: "Checking the video…" }); prev.replaceChildren(status);
+        try {
+          await checkVideo(fl);
+          const id = await uploadAV(fl, "video", pc => { status.textContent = "Uploading video… " + pc + "%"; });
+          if (file !== fl) return;
+          video = id;
+          const rm = h("button", { type: "button", cls: "sbtn" }, "✕ Remove"); rm.onclick = () => { video = null; file = null; prev.hidden = true; prev.replaceChildren(); };
+          prev.replaceChildren(h("video", { src: URL.createObjectURL(fl), controls: true, playsinline: true, muted: true, style: "max-width:100%;max-height:300px;border-radius:12px;display:block" }), rm);
+        } catch (e) { prev.replaceChildren(h("p", { cls: "msg bad", text: e.message })); video = null; }
       }), h("span", { cls: "grow" }), h("button", { cls: "btn" }, "Post")), m);
     f.onsubmit = async e => {
       e.preventDefault();
-      if (file && !photo) return say(m, "Please wait until the photo is ready.");
+      if (file && !photo && !video) return say(m, "Please wait until the photo or video is ready.");
       say(m, "Posting…", true);
       try {
-        const d = await api("/api/s/posts", { body: { text: f.text.value, photo } });
-        f.reset(); photo = null; file = null; prev.hidden = true; prev.replaceChildren();
+        const d = await api("/api/s/posts", { body: { text: f.text.value, photo, video } });
+        f.reset(); photo = null; file = null; video = null; prev.hidden = true; prev.replaceChildren();
         say(m, d.post.status === "pending" ? "Posted. The site owner will check it soon; until then only you can see it." : "Posted.", true);
         after && after(d.post);
       } catch (err) { say(m, err.message); }
@@ -514,7 +526,7 @@
     const add = m => {
       const day = new Date(m.at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
       if (day !== lastDay) { box.append(h("div", { cls: "day", text: day })); lastDay = day; }
-      const b = h("div", { cls: "bubble" + (m.mine ? " me" : "") }, m.photo && h("img", { src: m.photo, alt: "Photo", loading: "lazy" }), m.text, h("small", { text: clock(m.at) }));
+      const b = h("div", { cls: "bubble" + (m.mine ? " me" : "") }, m.photo && h("img", { src: m.photo, alt: "Photo", loading: "lazy" }), m.audio && h("audio", { src: m.audio, controls: true, preload: "none" }), m.text, h("small", { text: clock(m.at) }));
       b.oncontextmenu = e => { e.preventDefault(); };
       const opts = m.mine ? [["Delete for both", async () => { try { await api(`/api/s/messages/${m.id}/delete`, { body: {} }); b.remove(); } catch (er) { alertNote(er.message); } }]] : [["Report message", () => report("message", m.id)]];
       let press = null;
@@ -527,12 +539,13 @@
     const m = msgBox();
     const ta = h("textarea", { name: "text", rows: 1, maxlength: 2000, placeholder: "Message", "aria-label": "Message" });
     let sending = false;
-    const send = async (text, photo) => {
+    const send = async (text, photo, audio) => {
       if (sending) return; sending = true;
-      try { await api("/api/s/chats/" + encodeURIComponent(u.username), { body: { text, photo } }); say(m, "", true); await poll(); }
+      try { await api("/api/s/chats/" + encodeURIComponent(u.username), { body: { text, photo, audio } }); say(m, "", true); await poll(); }
       catch (e) { say(m, e.message); } finally { sending = false; }
     };
-    const f = h("form", {}, photoPicker(async fl => { say(m, "Sending photo…", true); try { const id = await uploadPhoto(fl); await send("", id); } catch (e) { say(m, e.message); } }, "📷"), ta, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
+    const voice = voiceButton(async blob => { say(m, "Sending voice message…", true); try { const id = await uploadAV(blob, "audio"); await send("", null, id); } catch (e) { say(m, e.message); } }, t => say(m, t));
+    const f = h("form", {}, photoPicker(async fl => { say(m, "Sending photo…", true); try { const id = await uploadPhoto(fl); await send("", id); } catch (e) { say(m, e.message); } }, "📷"), voice, ta, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
     f.onsubmit = e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ""; send(t); };
     ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer:fine)").matches) { e.preventDefault(); f.requestSubmit(); } };
     const head = h("div", { cls: "head" }, h("a", { href: "#/chats", cls: "sbtn", "aria-label": "Back" }, "←"), whoLink(u, u.last_seen && Date.now() - u.last_seen < 15 * 60_000 ? "active now" : u.last_seen ? "active " + ago(u.last_seen) + (Date.now() - u.last_seen < 7 * 86400_000 ? " ago" : "") : ""));
@@ -550,6 +563,111 @@
       if (r.messages.length && (near || r.messages.some(x => x.mine))) box.scrollTop = box.scrollHeight;
     }
     timer = setInterval(() => { if (!document.hidden) poll(); }, 3000);
+  }
+
+  // ---------- short videos and voice messages ----------
+  const VIDEO_MAX_MB = 40, VIDEO_MAX_S = 90, VOICE_MAX_S = 120;
+  // Sends a video or voice file, showing progress (videos can take a while on mobile data).
+  function uploadAV(blob, kind, onProgress) {
+    return new Promise((ok, no) => {
+      const x = new XMLHttpRequest();
+      x.open("POST", "/api/s/upload-av?kind=" + kind);
+      x.setRequestHeader("content-type", "application/octet-stream");
+      if (tok) x.setRequestHeader("authorization", "Bearer " + tok);
+      if (onProgress) x.upload.onprogress = e => e.lengthComputable && onProgress(Math.round(100 * e.loaded / e.total));
+      x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch {} x.status === 200 ? ok(d.id) : no(new Error(x.status === 413 ? "This file is too big. Please choose a shorter video (up to " + VIDEO_MAX_MB + " MB)." : d.error || "Could not send. Please try again.")); };
+      x.onerror = () => no(new Error("No internet connection. Please try again."));
+      x.send(blob);
+    });
+  }
+  // Checks a video from the phone: size and length.
+  function checkVideo(file) {
+    return new Promise((ok, no) => {
+      if (file.size > VIDEO_MAX_MB * 1048576) return no(new Error("This video is " + Math.round(file.size / 1048576) + " MB. Please choose one up to " + VIDEO_MAX_MB + " MB (about 1 minute; record in 720p to keep it small)."));
+      const v = document.createElement("video"), url = URL.createObjectURL(file);
+      v.preload = "metadata"; v.muted = true;
+      v.onloadedmetadata = () => { const d = v.duration; URL.revokeObjectURL(url); d > VIDEO_MAX_S + 1 ? no(new Error("This video is " + Math.round(d) + " seconds long. Please choose one up to " + VIDEO_MAX_S + " seconds.")) : ok(); };
+      v.onerror = () => { URL.revokeObjectURL(url); no(new Error("This video cannot be played in the browser. Please choose an MP4 video.")); };
+      v.src = url;
+    });
+  }
+  function videoPicker(onPick) {
+    const input = h("input", { type: "file", accept: "video/mp4,video/webm,video/quicktime,video/*", "aria-label": "Add a video" });
+    input.onchange = () => { if (input.files[0]) onPick(input.files[0]); input.value = ""; };
+    return h("label", { cls: "sbtn filebtn", title: "Add a short video" }, "🎬 Video", input);
+  }
+  const videoEl = (src, extra = {}) => h("video", { cls: "vid", src: src + "#t=0.1", controls: true, playsinline: true, preload: "metadata", ...extra });
+  // 🎤 button for chats: tap to record, tap ✓ to send, ✕ to cancel. Stops by itself after 2 minutes.
+  function voiceButton(onDone, onError) {
+    const wrap = h("span", { cls: "voice" });
+    const mic = h("button", { type: "button", cls: "sbtn", "aria-label": "Record a voice message", title: "Voice message" }, "🎤");
+    wrap.append(mic);
+    if (!window.MediaRecorder || !navigator.mediaDevices) { mic.hidden = true; return wrap; }
+    mic.onclick = async () => {
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch { return onError("Please allow the microphone to send a voice message."); }
+      const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"].find(t => MediaRecorder.isTypeSupported(t)) || "";
+      const rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 32000 } : {});
+      const parts = []; let cancelled = false, secs = 0;
+      const clockEl = h("b", { cls: "rec", text: "● 0:00" });
+      const stopBtn = h("button", { type: "button", cls: "btn", "aria-label": "Send voice message" }, "✓");
+      const cancelBtn = h("button", { type: "button", cls: "sbtn", "aria-label": "Cancel" }, "✕");
+      const tick = setInterval(() => { secs++; clockEl.textContent = "● " + Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0"); if (secs >= VOICE_MAX_S) rec.stop(); }, 1000);
+      rec.ondataavailable = e => e.data.size && parts.push(e.data);
+      rec.onstop = () => {
+        clearInterval(tick); stream.getTracks().forEach(t => t.stop()); wrap.replaceChildren(mic);
+        if (!cancelled && parts.length && secs >= 1) onDone(new Blob(parts, { type: rec.mimeType || type }));
+      };
+      stopBtn.onclick = () => rec.stop();
+      cancelBtn.onclick = () => { cancelled = true; rec.stop(); };
+      wrap.replaceChildren(cancelBtn, clockEl, stopBtn);
+      rec.start(1000);
+    };
+    return wrap;
+  }
+
+  // ---------- Reels: short videos, one screen each ----------
+  async function reelsPage() {
+    const list = h("div", { cls: "reels" });
+    const top = h("div", { cls: "row", style: "margin:10px 0" }, h("h1", { cls: "grow", style: "margin:0", text: "Reels" }), me ? h("a", { cls: "sbtn main", href: "#/new" }, "＋ Add a video") : h("a", { cls: "sbtn main", href: "#/signup" }, "Join to add videos"));
+    show(top, list);
+    // Fill the screen between the title and the menu bar at the bottom.
+    const fit = () => { if (!view.contains(list)) return removeEventListener("resize", fit); list.style.height = Math.max(360, innerHeight - list.getBoundingClientRect().top - window.scrollY - document.getElementById("nav").offsetHeight - 8) + "px"; };
+    fit(); addEventListener("resize", fit);
+    let muted = true, seen = new Set();
+    const io = new IntersectionObserver(es => es.forEach(e => { const v = e.target; if (e.isIntersecting) { v.muted = muted; v.play().catch(() => {}); } else v.pause(); }), { threshold: 0.6 });
+    const reel = p => {
+      const v = h("video", { src: p.video, playsinline: true, loop: true, muted: true, preload: "metadata" });
+      v.onclick = () => { muted = !muted; list.querySelectorAll("video").forEach(x => { x.muted = muted; }); sound.textContent = muted ? "🔇" : "🔊"; };
+      const sound = h("span", { cls: "snd", text: "🔇" });
+      const like = h("button", { type: "button", cls: p.liked ? "on" : "" }, "♥", h("small", { text: p.likes || "" }));
+      like.onclick = async () => {
+        if (!me) return needLogin("Please log in to like videos.");
+        try { const d = await api(`/api/s/posts/${p.id}/like`, { body: { like: !p.liked } }); p.liked = d.liked; p.likes = d.likes; like.className = p.liked ? "on" : ""; like.lastChild.textContent = p.likes || ""; } catch (e) { alertNote(e.message); }
+      };
+      const shareB = h("button", { type: "button" }, "↗", h("small", { text: "Share" }));
+      shareB.onclick = () => { const link = location.origin + "/community#/p/" + p.id; navigator.share ? navigator.share({ title: "Q India Community", url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(link), "_blank", "noopener"); };
+      const side = h("div", { cls: "side" }, like, h("a", { href: "#/p/" + p.id }, "💬", h("small", { text: p.comments || "" })), shareB);
+      menu(side, [!p.mine && ["Report video", () => report("post", p.id)], p.mine && ["Open post", () => go("#/p/" + p.id)]]);
+      const cap = h("div", { cls: "cap" }, h("a", { href: "#/u/" + p.user.username, cls: "row who" }, avatar(p.user, "sm"), h("b", { text: p.user.name })), p.text && h("p", {}, richText(p.text)),
+        p.status === "pending" && h("small", { text: "Only you can see this until the site owner checks it." }));
+      io.observe(v);
+      return h("div", { cls: "reel" }, v, sound, side, cap);
+    };
+    let before = 2 ** 53, busy = false, done = false;
+    const more = async () => {
+      if (busy || done) return; busy = true;
+      try {
+        const d = await api("/api/s/reels?before=" + before);
+        d.posts.filter(p => !seen.has(p.id)).forEach(p => { seen.add(p.id); list.append(reel(p)); });
+        if (d.posts.length) before = Math.min(...d.posts.map(p => p.id));
+        done = !d.more;
+        if (!list.children.length) list.replaceWith(h("div", { cls: "empty" }, h("p", { text: "No videos yet. Be the first to share a short video of a good queue!" }), me && h("a", { cls: "sbtn main", href: "#/new" }, "＋ Add a video")));
+      } catch (e) { alertNote(e.message); } finally { busy = false; }
+    };
+    list.onscroll = () => { if (list.scrollTop + list.clientHeight * 2 > list.scrollHeight) more(); };
+    await more();
   }
 
   // ---------- Status / Stories (disappear after 24 hours) ----------
@@ -698,7 +816,7 @@
       lastId = Math.max(lastId, x.id);
       if (x.info) return box.append(h("div", { cls: "day info", text: x.text }));
       const b = h("div", { cls: "bubble" + (x.mine ? " me" : "") }, !x.mine && x.user && h("a", { cls: "from", href: "#/u/" + x.user.username, text: x.user.name }),
-        x.photo && h("img", { src: x.photo, alt: "Photo", loading: "lazy" }), x.text, h("small", { text: clock(x.at) }));
+        x.photo && h("img", { src: x.photo, alt: "Photo", loading: "lazy" }), x.audio && h("audio", { src: x.audio, controls: true, preload: "none" }), x.text, h("small", { text: clock(x.at) }));
       const opts = [(x.mine || g.admin) && ["Delete for everyone", async () => { try { await api(`/api/s/group-messages/${x.id}/delete`, { body: {} }); b.remove(); } catch (er) { alertNote(er.message); } }],
         !x.mine && ["Report message", () => report("groupmsg", x.id)]].filter(Boolean);
       let press = null;
@@ -715,12 +833,13 @@
     setCannot(d.cannot);
     const ta = h("textarea", { name: "text", rows: 1, maxlength: 2000, placeholder: "Message", "aria-label": "Message" });
     let sending = false;
-    const send = async (text, photo) => {
+    const send = async (text, photo, audio) => {
       if (sending) return; sending = true;
-      try { await api(`/api/s/groups/${id}/messages`, { body: { text, photo } }); say(m, "", true); await poll(); }
+      try { await api(`/api/s/groups/${id}/messages`, { body: { text, photo, audio } }); say(m, "", true); await poll(); }
       catch (e) { say(m, e.message); } finally { sending = false; }
     };
-    const f = h("form", {}, photoPicker(async fl => { say(m, "Sending photo…", true); try { const pid = await uploadPhoto(fl); await send("", pid); } catch (e) { say(m, e.message); } }, "📷"), ta, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
+    const voice = voiceButton(async blob => { say(m, "Sending voice message…", true); try { const aid = await uploadAV(blob, "audio"); await send("", null, aid); } catch (e) { say(m, e.message); } }, t => say(m, t));
+    const f = h("form", {}, photoPicker(async fl => { say(m, "Sending photo…", true); try { const pid = await uploadPhoto(fl); await send("", pid); } catch (e) { say(m, e.message); } }, "📷"), voice, ta, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
     f.onsubmit = e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ""; send(t); };
     ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer:fine)").matches) { e.preventDefault(); f.requestSubmit(); } };
     const head = h("div", { cls: "head" }, h("a", { href: "#/groups", cls: "sbtn", "aria-label": "Back" }, "←"),
@@ -810,7 +929,7 @@
     clearInterval(timer); timer = null; clearTimeout(storyTimer);
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [a, b, c] = parts;
-    const nav = { "": "home", following: "home", all: "home", search: "search", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
+    const nav = { "": "home", following: "home", all: "home", search: "search", reels: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
     document.querySelectorAll("[data-nav]").forEach(x => x.classList.toggle("on", x.dataset.nav === nav));
     window.scrollTo(0, 0);
     switch (a || "") {
@@ -824,6 +943,7 @@
       case "p": return postPage(Number(b));
       case "u": return profilePage(b, c === "followers" || c === "following" ? c : null);
       case "search": return searchPage();
+      case "reels": return reelsPage();
       case "notifs": return notifsPage();
       case "chats": return chatsPage();
       case "chat": return chatPage(b);
