@@ -9,7 +9,7 @@ on:
     paths: ['android/**', '.github/workflows/android-aab.yml']
 
 permissions:
-  contents: read
+  contents: write  # only used to save an UNSIGNED build to the android-unsigned-build branch
 
 jobs:
   build:
@@ -65,6 +65,18 @@ jobs:
             cp android/app/build/outputs/bundle/release/app-release.aab "out/qindiaglobal-$V-UNSIGNED.aab"
           fi
           ls -l out
+
+      # Until the upload-key secrets exist, keep a copy of the unsigned AAB on a side branch so it
+      # can be signed offline with the private key (the key never comes to GitHub this way).
+      - name: Save unsigned build to the android-unsigned-build branch
+        if: env.SIGNED == 'no'
+        run: |
+          cd out
+          git init -q -b android-unsigned-build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -qm "Unsigned Android build ${{ github.run_number }} from ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-unsigned-build
 
       - uses: actions/upload-artifact@v4
         with:
