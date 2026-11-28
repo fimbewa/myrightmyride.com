@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Android app · Qindiaglobal</title>
+<meta name="description" content="Download the free Qindiaglobal Android app. Qindiaglobal app डाउनलोड करें।">
+<meta name="theme-color" content="#1d3557">
+<link rel="canonical" href="https://qindiaglobal.com/app">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/site.css">
+<style>
+.appbox{text-align:center;padding:24px 0}
+.appbox img{width:96px;height:96px;border-radius:22px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.appbox h1{font-size:28px;margin:14px 0 4px}
+.appbox .meta{color:var(--muted);font-size:14px;margin:0 0 18px}
+.steps{display:grid;gap:16px;margin:24px 0}
+.steps section{background:var(--bg);border-radius:14px;padding:14px 18px}
+.steps h2{font-size:19px;margin:0 0 8px;color:var(--deep)}
+.steps ol{padding-inline-start:22px;margin:0}.steps li{margin:6px 0;font-size:15px}
+.tnote{background:var(--bg);border-radius:12px;padding:10px 14px;font-size:14px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="Qindiaglobal home"><b>Q</b>india<span>global</span></a>
+    <select id="lang" aria-label="Language"></select>
+  </div>
+</header>
+<main class="wrap block">
+  <div class="appbox">
+    <img src="/icon-512.png" alt="Qindiaglobal app icon">
+    <h1>Qindiaglobal Android app</h1>
+    <p class="meta">Free · Version 1.0.7 · 1.6 MB · Android 7 and newer</p>
+    <a class="btn" href="/download/qindiaglobal.apk" download="qindiaglobal.apk">Download app · ऐप डाउनलोड करें</a>
+    <p class="meta" style="margin-top:12px">Coming soon on Google Play · जल्द ही Google Play पर</p>
+  </div>
+
+  <div class="steps">
+    <section lang="en">
+      <h2>How to install (English)</h2>
+      <ol>
+        <li>Tap <b>Download app</b> above. If Chrome asks, tap <b>Download anyway</b>.</li>
+        <li>When the download finishes, tap <b>Open</b> (or open <b>qindiaglobal.apk</b> from your Downloads).</li>
+        <li>If the phone says "install unknown apps" is blocked, tap <b>Settings</b>, switch on <b>Allow from this source</b>, then go back.</li>
+        <li>Tap <b>Install</b>. If Play Protect shows a warning, tap <b>More details</b> and then <b>Install anyway</b>. This only means the app is not on Google Play yet.</li>
+        <li>Open <b>Qindiaglobal</b> from your home screen.</li>
+      </ol>
+    </section>
+    <section lang="hi">
+      <h2>ऐप कैसे इंस्टॉल करें (हिंदी)</h2>
+      <ol>
+        <li>ऊपर <b>ऐप डाउनलोड करें</b> बटन दबाएँ। अगर Chrome पूछे, तो <b>फिर भी डाउनलोड करें</b> दबाएँ।</li>
+        <li>डाउनलोड पूरा होने पर <b>खोलें</b> दबाएँ (या Downloads में <b>qindiaglobal.apk</b> खोलें)।</li>
+        <li>अगर फ़ोन लिखे कि "अज्ञात ऐप इंस्टॉल करना" बंद है, तो <b>सेटिंग</b> दबाएँ, <b>इस स्रोत से अनुमति दें</b> चालू करें और वापस आएँ।</li>
+        <li><b>इंस्टॉल करें</b> दबाएँ। अगर Play Protect चेतावनी दिखाए, तो <b>अधिक जानकारी</b> और फिर <b>फिर भी इंस्टॉल करें</b> दबाएँ। इसका मतलब सिर्फ़ इतना है कि ऐप अभी Google Play पर नहीं है।</li>
+        <li>होम स्क्रीन से <b>Qindiaglobal</b> खोलें।</li>
+      </ol>
+    </section>
+  </div>
+
+  <p class="tnote">The app opens qindiaglobal.com, so it always shows the latest website. It asks for the camera and microphone only when you start a call or a voice note. iPhone users can add the website to the home screen: Safari → Share → Add to Home Screen.<br>
+  यह ऐप qindiaglobal.com खोलता है, इसलिए हमेशा नई वेबसाइट दिखती है। कैमरा और माइक्रोफ़ोन की अनुमति केवल कॉल या वॉइस नोट के समय माँगी जाती है।</p>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <p class="disc"><b data-t="discH"></b> <span data-t="disc"></span></p>
+    <p class="small"><span data-t="tagline"></span> · qindiaglobal.com</p>
+  </div>
+</footer>
+<script src="/i18n.js"></script>
+<script src="/i18n-in1.js"></script>
+<script src="/i18n-in2.js"></script>
+<script>
+(function () {
+  const sel = document.getElementById("lang"); QI_fillSelect(sel);
+  const go = l => { sel.value = l; QI_apply(l); document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; document.querySelector("main").dir = "ltr"; };
+  sel.onchange = () => go(sel.value); go(QI_pick());
+})();
+</script>
+</body>
+</html>
