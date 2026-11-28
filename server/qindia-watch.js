@@ -2,10 +2,10 @@
 // length and a view count. Each member and each Page is a channel: its videos are listed together, and
 // "Subscribe" is the same as following that member or Page. Part of server/qindia-social.js.
 module.exports = function watch(x) {
-  const { db, r, bad, now, POST_SQL, visible, notBlocked, postOut, ipHash, ytOf } = x;
+  const { db, r, bad, now, POST_SQL, visible, notBlocked, postOut, ipHash, ytOf, fbOf } = x;
   // An uploaded video (older posts), or a text post with a YouTube link (the Community is text and links only now).
-  const IS_VIDEO = "(p.photo LIKE '%.mp4' OR p.photo LIKE '%.webm' OR (p.photo IS NULL AND (p.text LIKE '%youtu.be/%' OR p.text LIKE '%youtube.com/%')))";
-  const isVid = p => /\.(mp4|webm)$/.test(p.photo || "") || (!p.photo && !!ytOf(p.text));
+  const IS_VIDEO = "(p.photo LIKE '%.mp4' OR p.photo LIKE '%.webm' OR (p.photo IS NULL AND (p.text LIKE '%youtu.be/%' OR p.text LIKE '%youtube.com/%' OR p.text LIKE '%facebook.com/%' OR p.text LIKE '%fb.watch/%')))";
+  const isVid = p => /\.(mp4|webm)$/.test(p.photo || "") || (!p.photo && !!(ytOf(p.text) || fbOf(p.text)));
   // Optional login: the list works for visitors too.
   const who = (req, res, next) => { req.me = x.who(req); next(); };
 

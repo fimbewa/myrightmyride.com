@@ -60,6 +60,11 @@
   // YouTube links play right in the post (youtube-nocookie.com); every other link opens in a new tab. No file is kept on our server.
   const ytFrame = (id, cls = "pic yt") => h("div", { cls }, h("iframe", { src: "https://www.youtube-nocookie.com/embed/" + id, title: "YouTube video", loading: "lazy",
     allow: "accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen", allowfullscreen: true, referrerpolicy: "strict-origin-when-cross-origin" }));
+  // Facebook videos and lives play through Facebook's own player; the link below opens the Facebook app.
+  const fbFrame = (url, cls = "pic yt") => h("div", { cls }, h("iframe", { src: "https://www.facebook.com/plugins/video.php?show_text=false&href=" + encodeURIComponent(url), title: "Facebook video", loading: "lazy",
+    allow: "autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen", allowfullscreen: true }));
+  const playerOf = (v, cls) => v.yt ? ytFrame(v.yt, cls) : v.fb ? fbFrame(v.fb, cls) : null;
+  const liveTag = v => v.live ? h("span", { cls: "livetag", text: "🔴 LIVE" }) : null;
   const ytThumb = id => "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg";
   const msgBox = () => h("p", { cls: "msg" });
   // ✨ Writing help (write-help.js): ideas, tidy-up, translate and hashtags. Free: on-device AI where the browser has it, simple helpers everywhere else.
@@ -348,8 +353,9 @@
       p.photo && h("img", { cls: "pic", src: p.photo, alt: "Photo shared by " + p.user.name, loading: "lazy" }),
       p.video && videoEl(p.video, { cls: "pic vid", poster: p.poster || null }),
       p.video && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch" + (p.duration ? " · " + dur(p.duration) : "") + " · " + views(p.views)),
-      !p.video && p.yt && ytFrame(p.yt),
-      !p.video && p.yt && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch · " + views(p.views)),
+      !p.video && (p.yt || p.fb) && playerOf(p),
+      !p.video && p.live && p.status === "ok" && h("a", { cls: "watchlink live", href: "#/live/" + p.id }, "🔴 LIVE now · Watch with live chat"),
+      !p.video && !p.live && (p.yt || p.fb) && p.status === "ok" && h("a", { cls: "watchlink", href: "#/v/" + p.id }, "▶ Open in Watch · " + views(p.views)),
       p.shared && sharedBox(p.shared),
       h("div", { cls: "acts" }, likeBtn, full ? h("span", { cls: "muted", style: "flex:1;text-align:center;padding:8px", text: "💬 " + p.comments }) : h("a", { href: "#/p/" + p.id }, "💬 " + (p.comments || "") + " Comment"), share));
     return card;
@@ -404,7 +410,7 @@
           const rm = h("button", { type: "button", cls: "sbtn" }, "✕ Remove"); rm.onclick = () => { video = null; file = null; prev.hidden = true; prev.replaceChildren(); };
           prev.replaceChildren(h("video", { src: URL.createObjectURL(fl), controls: true, playsinline: true, muted: true, style: "max-width:100%;max-height:300px;border-radius:12px;display:block" }), rm);
         } catch (e) { prev.replaceChildren(h("p", { cls: "msg bad", text: e.message })); video = null; }
-      }), h("span", { cls: "grow" }), h("button", { cls: "btn" }, "Post")), m);
+      }), h("a", { cls: "sbtn", href: page ? "#/live/new/" + page.handle : "#/live/new" }, "🔴 Go live"), h("span", { cls: "grow" }), h("button", { cls: "btn" }, "Post")), m);
     f.onsubmit = async e => {
       e.preventDefault();
       if (file && !photo && !video) return say(m, "Please wait until the photo or video is ready.");
@@ -438,7 +444,7 @@
     const top = me ? composer(p => list.prepend(postCard(p))) : h("div", { cls: "card" }, h("h1", { text: "Q India Community" }),
       h("p", { text: "Share posts and photos, follow people, and message friends privately. Free for everyone, always." }),
       h("p", {}, h("a", { cls: "btn", href: "#/signup" }, "Create free account"), " ", h("a", { cls: "sbtn", href: "#/login" }, "Log in")));
-    show(rulesNote(), me && storyBar(), top, tabs, list);
+    show(rulesNote(), liveBar(), me && storyBar(), top, tabs, list);
     await loadMore(list, b => `/api/s/feed?tab=${tab}&before=${b}`, d => d.posts.map(p => postCard(p)),
       tab === "following" ? h("div", { cls: "empty" }, h("p", { text: "Nothing here yet. Follow people to see their posts, or look at everyone's posts." }), h("a", { cls: "sbtn", href: "#/all" }, "See everyone"), " ", h("a", { cls: "sbtn", href: "#/search" }, "Find people"))
         : h("p", { cls: "empty", text: "No posts yet. Be the first to share something!" }));
@@ -546,8 +552,8 @@
   async function notifsPage() {
     if (!me) return needLogin();
     let d; try { d = await api("/api/s/notifs"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
-    const TXT = { like: "liked your post", comment: "commented on your post", follow: "started following you", share: "shared your post" };
-    show(h("h1", { text: "Alerts" }), h("div", { cls: "list" }, d.items.length ? d.items.map(n => h("a", { cls: "li" + (n.read ? "" : " unread"), href: n.post_id ? "#/p/" + n.post_id : "#/u/" + n.user.username },
+    const TXT = { like: "liked your post", comment: "commented on your post", follow: "started following you", share: "shared your post", live: "is live now 🔴" };
+    show(h("h1", { text: "Alerts" }), h("div", { cls: "list" }, d.items.length ? d.items.map(n => h("a", { cls: "li" + (n.read ? "" : " unread"), href: n.post_id ? (n.kind === "live" ? "#/live/" : "#/p/") + n.post_id : "#/u/" + n.user.username },
       avatar(n.user), h("span", { cls: "grow" }, h("b", { text: n.user.name }), " ", TXT[n.kind] || n.kind, h("div", { cls: "last", text: ago(n.created_at) })))) : h("p", { cls: "empty", text: "No alerts yet. When someone likes, comments or follows you, it shows here." })));
     badges();
   }
@@ -800,9 +806,9 @@
   const views = n => (n >= 100000 ? (n / 100000).toFixed(1).replace(/\.0$/, "") + " lakh" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n || 0)) + " view" + (n === 1 ? "" : "s");
   const titleOf = v => { const t = (v.text || "").replace(/https?:\/\/\S+/g, "").split("\n").map(x => x.trim()).find(Boolean) || ""; return t ? ([...t].length > 90 ? [...t].slice(0, 90).join("") + "…" : t) : "Video by " + v.user.name; };
   const videoTile = v => h("a", { cls: "vt", href: "#/v/" + v.id },
-    h("span", { cls: "thumb" }, !v.video && v.yt ? h("img", { src: ytThumb(v.yt), alt: "", loading: "lazy" }) : v.poster ? h("img", { src: v.poster, alt: "", loading: "lazy" }) : h("video", { src: v.video + "#t=0.5", preload: "metadata", muted: true, playsinline: true }), v.duration > 0 && h("i", { text: dur(v.duration) })),
+    h("span", { cls: "thumb" }, liveTag(v), !v.video && v.fb && !v.yt ? h("span", { cls: "fbthumb", text: "f" }) : !v.video && v.yt ? h("img", { src: ytThumb(v.yt), alt: "", loading: "lazy" }) : v.poster ? h("img", { src: v.poster, alt: "", loading: "lazy" }) : h("video", { src: v.video + "#t=0.5", preload: "metadata", muted: true, playsinline: true }), v.duration > 0 && h("i", { text: dur(v.duration) })),
     h("span", { cls: "row", style: "align-items:flex-start" }, avatar(v.user, "sm"), h("span", { cls: "grow" }, h("b", { text: titleOf(v) }), h("small", { cls: "muted", text: v.user.name + " · " + views(v.views) + " · " + ago(v.created_at) }))));
-  const watchTabs = on => h("div", { cls: "tabs" }, [mediaOn() && ["#/reels", "Reels", "reels"], ["#/watch", "Latest", "latest"], ["#/watch/popular", "Popular", "popular"], me && ["#/watch/subs", "Subscriptions", "subs"]].filter(Boolean)
+  const watchTabs = on => h("div", { cls: "tabs" }, [mediaOn() && ["#/reels", "Reels", "reels"], ["#/live", "🔴 Live", "live"], ["#/watch", "Latest", "latest"], ["#/watch/popular", "Popular", "popular"], me && ["#/watch/subs", "Subscriptions", "subs"]].filter(Boolean)
     .map(([href, label, k]) => h("a", { href, cls: on === k ? "on" : "" }, label)));
   async function watchPage(a, b) {
     const sort = a === "popular" || a === "subs" ? a : "latest";
@@ -822,7 +828,8 @@
   async function videoPage(id) {
     let d; try { d = await api("/api/s/watch/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
     const v = d.video, ch = d.channel;
-    const player = !v.video && v.yt ? ytFrame(v.yt, "player yt") : h("video", { cls: "player", src: v.video, poster: v.poster || null, controls: true, playsinline: true, autoplay: true, preload: "metadata" });
+    if (v.live) return go("#/live/" + v.id); // a live stream opens with its live chat
+    const player = !v.video && (v.yt || v.fb) ? playerOf(v, "player yt") : h("video", { cls: "player", src: v.video, poster: v.poster || null, controls: true, playsinline: true, autoplay: true, preload: "metadata" });
     let counted = false;
     if (!v.video) { counted = true; api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {}); } // a YouTube player cannot tell us when it plays
     player.onplay = () => { if (!counted) { counted = true; api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {}); } };
@@ -987,6 +994,85 @@
   // ---------- Status / Stories (disappear after 24 hours) ----------
   const BG = ["#1d3557", "#e85d04", "#2a9d8f", "#6a4c93", "#c1121f", "#264653"];
   let storyTimer = null;
+  // ---------- Live (a stream on YouTube or Facebook, watched here with a live chat; no video passes through our server) ----------
+  // "🔴 Live now" strip at the top of the feed; empty (and hidden) when nobody is live.
+  function liveBar() {
+    const bar = h("div", { cls: "livebar", hidden: true });
+    api("/api/s/live").then(d => {
+      if (!d.live.length) return;
+      bar.replaceChildren(h("b", { text: "🔴 Live now" }), ...d.live.slice(0, 10).map(v => h("a", { cls: "livechip", href: "#/live/" + v.id }, avatar(v.user, "sm"), h("span", { text: [...v.user.name].slice(0, 16).join("") }))));
+      bar.hidden = false;
+    }).catch(() => {});
+    return bar;
+  }
+  async function livesPage() {
+    const grid = h("div", { cls: "vgrid" });
+    show(h("h1", { text: "Watch" }), watchTabs("live"), me && h("p", {}, h("a", { cls: "sbtn main", href: "#/live/new" }, "🔴 Go live")), grid);
+    let d; try { d = await api("/api/s/live"); } catch (e) { return grid.append(h("p", { cls: "empty", text: e.message })); }
+    grid.append(...(d.live.length ? d.live.map(videoTile) : [h("p", { cls: "empty", text: "Nobody is live right now. Go live from the YouTube or Facebook app, then share the link here." })]));
+  }
+  function goLivePage(pageHandle) {
+    if (!me) return needLogin("Please log in to go live.");
+    const m = msgBox();
+    const f = h("form", { cls: "card" }, h("h1", { text: "🔴 Go live" }),
+      h("ol", { cls: "steps" },
+        h("li", {}, "Start a live stream in the ", h("b", { text: "YouTube" }), " app (tap ＋, then ", h("b", { text: "Go live" }), ") or the ", h("b", { text: "Facebook" }), " app (tap ", h("b", { text: "Live" }), ")."),
+        h("li", {}, "In that app tap ", h("b", { text: "Share" }), ", then ", h("b", { text: "Copy link" }), "."),
+        h("li", {}, "Paste the link here and tap ", h("b", { text: "Go live" }), ". Your followers get an alert, and everyone can watch here with a live chat.")),
+      h("label", {}, "Title", h("input", { name: "title", maxlength: 120, required: true, placeholder: "For example: Morning queue at Dadar station" })),
+      h("label", {}, "Link of your live stream", h("input", { name: "link", type: "url", required: true, placeholder: "https://youtube.com/live/…  or  https://facebook.com/…" })),
+      pageHandle && h("p", { cls: "muted", text: "You are going live as your Page @" + pageHandle + "." }),
+      h("p", { cls: "muted", text: "The video stays on YouTube or Facebook; Qindia only shows it. Follow the Rules: no faces of strangers without consent, no fights or accidents." }),
+      h("button", { cls: "btn" }, "Go live"), m);
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Please wait…", true);
+      try { const d = await api("/api/s/live", { body: { title: f.title.value, link: f.link.value, page: pageHandle || undefined } }); go("#/live/" + d.post.id); }
+      catch (err) { say(m, err.message); }
+    };
+    show(f);
+  }
+  async function livePage(id) {
+    let d; try { d = await api("/api/s/watch/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const v = d.video, ch = d.channel;
+    api(`/api/s/watch/${v.id}/view`, { body: {} }).catch(() => {});
+    const state = h("p", { cls: "muted", style: "margin:0" });
+    const setLive = on => { v.live = on; state.replaceChildren(on ? h("span", { cls: "livetag", text: "🔴 LIVE" }) : "Live ended · " + ago(v.created_at), " ", views(v.views)); };
+    setLive(!!v.live);
+    const chat = h("div", { cls: "livechat", "aria-live": "polite" });
+    let last = 0;
+    const line1 = c => h("div", { cls: "lc" }, h("a", { href: "#/u/" + c.user.username, text: c.user.name }), " ", richText(c.text));
+    const pull = async () => {
+      try {
+        const r = await api(`/api/s/live/${id}/chat?after=${last}`);
+        const near = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 60;
+        r.chat.forEach(c => { last = Math.max(last, c.id); chat.append(line1(c)); });
+        if (!chat.children.length) chat.append(h("p", { cls: "muted lc-empty", text: "No messages yet. Say hello!" }));
+        else chat.querySelector(".lc-empty")?.remove();
+        if (near) chat.scrollTop = chat.scrollHeight;
+        if (v.live !== r.live) setLive(r.live);
+      } catch {}
+    };
+    let form;
+    if (me) {
+      const ta = h("input", { name: "text", maxlength: 300, placeholder: "Say something…", "aria-label": "Live chat message", autocomplete: "off" });
+      form = h("form", { cls: "row lc-form" }, ta, h("button", { cls: "btn" }, "Send"));
+      form.onsubmit = async e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ""; try { await api(`/api/s/posts/${id}/comments`, { body: { text: t } }); await pull(); } catch (err) { alertNote(err.message); } };
+    } else form = h("p", { cls: "muted" }, h("a", { href: "#/login" }, "Log in"), " to chat.");
+    const end = v.mine && v.live && h("button", { cls: "sbtn", type: "button", onclick: async () => { if (!confirm("End your live here? (Also stop it in the YouTube or Facebook app.)")) return; try { await api(`/api/s/live/${id}/end`, { body: {} }); setLive(false); end.remove(); } catch (e) { alertNote(e.message); } } }, "■ End live");
+    const link = location.origin + "/community#/live/" + id;
+    show(h("div", { cls: "watch" }, playerOf(v, "player yt")),
+      h("h1", { cls: "vtitle", text: titleOf(v).replace(/^🔴 LIVE:\s*/, "") }), state,
+      v.status === "pending" && h("p", { cls: "note", text: "Only you can see this until the site owner checks it." }),
+      h("div", { cls: "row", style: "margin:10px 0;flex-wrap:wrap" }, h("a", { cls: "row who grow", href: (ch.page ? "#/pg/" : "#/u/") + ch.username }, avatar(ch), h("span", { cls: "grow" }, h("b", { text: ch.name }), h("small", { cls: "muted", text: ch.subscribers + " follower" + (ch.subscribers === 1 ? "" : "s") })))),
+      h("div", { cls: "row", style: "flex-wrap:wrap" },
+        h("button", { cls: "sbtn", type: "button", onclick: () => navigator.share ? navigator.share({ title: titleOf(v), url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(titleOf(v) + " " + link), "_blank") }, "↗ Share"),
+        v.fb && h("a", { cls: "sbtn", href: v.fb, target: "_blank", rel: "noopener nofollow" }, "Open on Facebook"), end,
+        !v.mine && h("button", { cls: "sbtn", type: "button", onclick: () => report("post", v.id) }, "⚑ Report")),
+      h("h2", { text: "Live chat" }), chat, form);
+    await pull();
+    const timer = setInterval(() => { if (!chat.isConnected) return clearInterval(timer); if (!document.hidden) pull(); }, 4000);
+  }
+
   function storyBar() {
     const bar = h("div", { cls: "stories", "aria-label": "Status updates" });
     api("/api/s/stories").then(d => {
@@ -1356,7 +1442,7 @@
     clearInterval(timer); timer = null; clearTimeout(storyTimer);
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [a, b, c] = parts;
-    const nav = { "": "home", following: "home", all: "home", pages: "home", pg: "home", share: "home", search: "search", reels: "reels", watch: "reels", v: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
+    const nav = { "": "home", following: "home", all: "home", pages: "home", pg: "home", share: "home", search: "search", reels: "reels", watch: "reels", live: "reels", v: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
     document.querySelectorAll("[data-nav]").forEach(x => x.classList.toggle("on", x.dataset.nav === nav));
     window.scrollTo(0, 0);
     switch (a || "") {
@@ -1382,6 +1468,7 @@
       case "groups": return groupsPage();
       case "g": return b === "new" ? newGroupPage() : c === "info" ? groupInfoPage(Number(b)) : groupPage(Number(b));
       case "join": return joinPage(b);
+      case "live": return b === "new" ? goLivePage(c) : b ? livePage(Number(b)) : livesPage();
       case "status": return b === "new" ? storyComposer() : storyPage(b);
       case "me": return !me ? needLogin() : b === "edit" ? editPage() : b === "settings" ? settingsPage() : go("#/u/" + me.username);
       default: return feedPage();

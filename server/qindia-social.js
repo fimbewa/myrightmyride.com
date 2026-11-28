@@ -21,6 +21,9 @@ const MEDIA_RX = /^[a-f0-9]{32}\.(jpg|mp4|webm|m4a|weba|ogg)$/;
 // A YouTube link in a post plays in the post and lists the post on Watch (the video stays on YouTube).
 const YT_RX = /(?:youtube\.com\/(?:watch\?(?:\S*?&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/;
 const ytOf = text => { const m = String(text || "").match(YT_RX); return m ? m[1] : null; };
+// A Facebook video or live link plays in the post through Facebook's own player.
+const FB_RX = /https?:\/\/(?:www\.|m\.|web\.)?(?:facebook\.com\/(?:[^\s\/?#]+\/videos\/[^\s]+|watch\/?\?v=\d+|[^\s\/?#]+\/live\b[^\s]*|reel\/\d+|video\.php\?v=\d+)|fb\.watch\/[A-Za-z0-9_-]+\/?)/;
+const fbOf = text => { const m = String(text || "").match(FB_RX); return m ? m[0] : null; };
 const memberMedia = () => process.env.QI_MEMBER_MEDIA === "1";
 const TEXT_ONLY = "Qindia Community is text only: photos, videos and voice messages cannot be added.";
 const KIND_OF = { jpg: "photo", mp4: "video", webm: "video", m4a: "audio", weba: "audio", ogg: "audio" };
@@ -94,7 +97,7 @@ CREATE TABLE IF NOT EXISTS s_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL);
   created_at INTEGER NOT NULL, PRIMARY KEY (provider, subject))`);
   // Added later: posts made as a Page (page_id) and shares of another post (share_of).
   // Added later for Watch (YouTube-style videos): cover picture, length in seconds, and views.
-  for (const col of ["poster TEXT", "duration INTEGER", "views INTEGER NOT NULL DEFAULT 0"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col.split(" ")[0])) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col}`);
+  for (const col of ["poster TEXT", "duration INTEGER", "views INTEGER NOT NULL DEFAULT 0", "live_until INTEGER"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col.split(" ")[0])) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col}`);
   db.exec("CREATE TABLE IF NOT EXISTS s_views (post_id INTEGER NOT NULL REFERENCES s_posts(id) ON DELETE CASCADE, viewer TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (post_id, viewer))");
   for (const col of ["page_id", "share_of"]) if (!db.prepare("PRAGMA table_info(s_posts)").all().some(c => c.name === col)) db.exec(`ALTER TABLE s_posts ADD COLUMN ${col} INTEGER`);
   db.exec("CREATE INDEX IF NOT EXISTS s_posts_page ON s_posts(page_id, id)");
@@ -578,7 +581,9 @@ CREATE TABLE IF NOT EXISTS s_codes (
     const out = {
       id: p.id, text: p.text || "", photo: null, ...mediaOut(p.photo), status: p.status,
       ...(mediaKind(p.photo) === "video" ? { poster: p.poster ? "/media/" + p.poster : null, duration: p.duration || 0, views: p.views || 0 } : {}),
-      ...(!p.photo && ytOf(p.text) ? { yt: ytOf(p.text), views: p.views || 0 } : {}),
+      ...(!p.photo && ytOf(p.text) ? { yt: ytOf(p.text), views: p.views || 0 } : !p.photo && fbOf(p.text) ? { fb: fbOf(p.text), views: p.views || 0 } : {}),
+      // A live stream (on YouTube or Facebook) shared here: "live" while it is on, "wasLive" afterwards.
+      ...(p.live_until ? (p.live_until > now() ? { live: true } : { wasLive: true }) : {}),
       likes: p.likes, comments: p.comments, created_at: p.created_at,
       liked: meId ? !!db.prepare("SELECT 1 FROM s_likes WHERE post_id = ? AND user_id = ?").get(p.id, meId) : false,
       mine: meId === p.user_id,
@@ -691,7 +696,8 @@ CREATE TABLE IF NOT EXISTS s_codes (
     if (limited(req, "comment:" + me.id, 60, 3600_000)) return bad(res, "Too many comments in the last hour. Please wait a little.", 429);
     const status = isDoubtful(text) || me.reports >= 3 ? "pending" : "ok";
     const id = db.prepare("INSERT INTO s_comments(post_id, user_id, text, status, created_at) VALUES(?,?,?,?,?)").run(p.id, me.id, text, status, now()).lastInsertRowid;
-    if (status === "ok") { db.prepare("UPDATE s_posts SET comments = comments + 1 WHERE id = ?").run(p.id); notify(p.user_id, "comment", me.id, p.id); }
+    // Live chat on a live stream does not send an alert for every line.
+    if (status === "ok") { db.prepare("UPDATE s_posts SET comments = comments + 1 WHERE id = ?").run(p.id); if (!(p.live_until > now())) notify(p.user_id, "comment", me.id, p.id); }
     res.json({ id, status });
   });
 
@@ -896,7 +902,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
   });
 
   // ---------- group chats and Status / Stories (server/qindia-groups.js, server/qindia-stories.js) ----------
-  const ext = { ytOf, db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
+  const ext = { ytOf, fbOf, notify, avatarUrl, db, r, login, bad, now, line, para, takeMedia, mediaKind, mediaOut, dropMedia, pubUser, blockedEither, follows, limited, isBad, isDoubtful, photoApproval, hold,
     reportKinds: {}, reportItem: {}, ownerActions: {}, ownerCounts: {}, ownerPending: {} };
   require("./qindia-groups")(ext);
   require("./qindia-stories")(ext);
@@ -905,6 +911,7 @@ CREATE TABLE IF NOT EXISTS s_codes (
   require("./qindia-watch")(ext);
   Object.assign(ext, { owner, setting });
   require("./qindia-calls")(ext);
+  require("./qindia-live")(ext);
 
   // ---------- owner: community moderation on /admin ----------
   r.get("/api/admin/community", owner, (req, res) => {
