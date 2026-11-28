@@ -1,6 +1,6 @@
 // Q India Community: the page at qindiaglobal.com/community. One page; the part after # picks the screen:
 // #/ feed · #/new · #/p/<id> post · #/u/<username> profile · #/search · #/chats · #/chat/<username> · #/notifs · #/me · #/login · #/signup · #/recover
-// #/reels (short videos) · #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
+// #/pages · #/pages/new · #/pg/<handle> · #/pg/<handle>/edit (Pages) · #/share/<post id> · #/reels (short videos) · #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
 (function () {
   "use strict";
   const view = document.getElementById("view");
@@ -49,7 +49,8 @@
   }
   const clock = ms => new Date(ms).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
   const avatar = (u, cls = "") => u.avatar ? h("img", { cls: "av " + cls, src: u.avatar, alt: "" }) : h("span", { cls: "av " + cls, "aria-hidden": "true", text: [...(u.name || u.username || "?")][0] });
-  const whoLink = (u, sub) => h("a", { cls: "row who grow", href: "#/u/" + u.username }, avatar(u), h("span", { cls: "grow" }, h("b", { text: u.name }), h("small", { text: "@" + u.username + (sub ? " · " + sub : "") })));
+  // A person (#/u/<username>) or a Page (#/pg/<handle>).
+  const whoLink = (u, sub) => h("a", { cls: "row who grow", href: (u.page ? "#/pg/" : "#/u/") + u.username }, avatar(u), h("span", { cls: "grow" }, h("b", { text: u.name }), h("small", { text: (u.page ? "Page · @" : "@") + u.username + (sub ? " · " + sub : "") })));
   // Text with clickable web links (the text itself is never treated as HTML).
   function richText(text) {
     const out = [], rx = /https?:\/\/[^\s<]+[^\s<.,;:!?)'"]/g; let last = 0, m;
@@ -254,11 +255,21 @@
       catch (e) { alertNote(e.message); }
     };
     const link = location.origin + "/community#/p/" + p.id;
+    // Share: on Q India Community (to my followers) or outside (WhatsApp and other apps).
     const share = h("button", { type: "button" }, "↗ Share");
-    share.onclick = async () => {
+    const outside = () => {
       const text = (p.text || "A post on Q India Community").slice(0, 100);
       if (navigator.share) return navigator.share({ title: "Q India Community", text, url: link }).catch(() => {});
       window.open("https://wa.me/?text=" + encodeURIComponent(text + " " + link), "_blank", "noopener");
+    };
+    share.onclick = e => {
+      e.stopPropagation();
+      if (p.status !== "ok") return outside();
+      const m = h("div", { cls: "more-menu share-menu" },
+        h("button", { type: "button", onclick: () => { m.remove(); me ? go("#/share/" + (p.shared && p.shared.id ? p.shared.id : p.id)) : needLogin("Please log in to share posts."); } }, "🔁 Share on Q India Community"),
+        h("button", { type: "button", onclick: () => { m.remove(); outside(); } }, "📤 Share on WhatsApp or other apps"));
+      share.parentNode.style.position = "relative"; share.parentNode.append(m);
+      setTimeout(() => document.addEventListener("click", () => m.remove(), { once: true }));
     };
     const head = h("div", { cls: "row ph" }, whoLink(p.user, ago(p.created_at)));
     menu(head, [
@@ -271,14 +282,36 @@
       p.text && h("div", { cls: "tx" }, richText(p.text)),
       p.photo && h("img", { cls: "pic", src: p.photo, alt: "Photo shared by " + p.user.name, loading: "lazy" }),
       p.video && videoEl(p.video, { cls: "pic vid" }),
+      p.shared && sharedBox(p.shared),
       h("div", { cls: "acts" }, likeBtn, full ? h("span", { cls: "muted", style: "flex:1;text-align:center;padding:8px", text: "💬 " + p.comments }) : h("a", { href: "#/p/" + p.id }, "💬 " + (p.comments || "") + " Comment"), share));
     return card;
   }
-  function composer(after) {
+  // The original post inside a share.
+  function sharedBox(o) {
+    if (o.gone) return h("p", { cls: "shared muted", text: "This post is no longer available." });
+    return h("a", { cls: "shared", href: "#/p/" + o.id }, h("div", { cls: "row" }, avatar(o.user, "sm"), h("span", { cls: "grow" }, h("b", { text: o.user.name }), " ", h("small", { cls: "muted", text: ago(o.created_at) }))),
+      o.text && h("div", { cls: "tx" }, [...o.text].length > 300 ? [...o.text].slice(0, 300).join("") + "…" : o.text),
+      o.photo && h("img", { src: o.photo, alt: "", loading: "lazy" }), o.video && h("video", { src: o.video + "#t=0.1", preload: "metadata", muted: true, playsinline: true }));
+  }
+  async function sharePage(id) {
+    if (!me) return needLogin("Please log in to share posts.");
+    let d; try { d = await api("/api/s/posts/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const pages = (await api("/api/s/pages").catch(() => ({ mine: [] }))).mine.filter(x => !x.closed);
+    const m = msgBox();
+    const as = pages.length ? h("select", { name: "as", "aria-label": "Share as" }, h("option", { value: "" }, "Share as me (" + me.name + ")"), pages.map(x => h("option", { value: x.handle }, "Share as Page: " + x.name))) : null;
+    const f = h("form", { cls: "card compose" }, h("h1", { text: "Share this post" }),
+      h("textarea", { name: "text", maxlength: 5000, placeholder: "Say something about this (optional)" }), sharedBox(d.post), as, h("button", { cls: "btn" }, "Share"), m);
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Sharing…", true);
+      try { const r = await api("/api/s/posts", { body: { text: f.text.value, share: d.post.id, page: as && as.value || undefined } }); go("#/p/" + r.post.id); } catch (err) { say(m, err.message); }
+    };
+    show(f);
+  }
+  function composer(after, page) {
     const m = msgBox(); let photo = null, file = null, video = null;
     const prev = h("div", { cls: "prev", hidden: true });
     const f = h("form", { cls: "card compose" },
-      h("div", { cls: "row" }, me && avatar(me, "sm"), h("b", { text: "Share with the community" })),
+      h("div", { cls: "row" }, page ? avatar(page, "sm") : me && avatar(me, "sm"), h("b", { text: page ? "Post as " + page.name : "Share with the community" })),
       h("textarea", { name: "text", maxlength: 5000, placeholder: "What's happening? Share a good queue you saw, a tip, or a photo." }), prev,
       h("div", { cls: "row" }, photoPicker(async fl => {
         file = fl; photo = null; video = null; prev.hidden = false; prev.replaceChildren(h("p", { cls: "muted", text: "Preparing photo…" }));
@@ -305,7 +338,7 @@
       if (file && !photo && !video) return say(m, "Please wait until the photo or video is ready.");
       say(m, "Posting…", true);
       try {
-        const d = await api("/api/s/posts", { body: { text: f.text.value, photo, video } });
+        const d = await api("/api/s/posts", { body: { text: f.text.value, photo, video, page: page ? page.handle : undefined } });
         f.reset(); photo = null; file = null; video = null; prev.hidden = true; prev.replaceChildren();
         say(m, d.post.status === "pending" ? "Posted. The site owner will check it soon; until then only you can see it." : "Posted.", true);
         after && after(d.post);
@@ -329,7 +362,7 @@
   async function feedPage(tab) {
     tab = me && tab !== "all" ? tab || "following" : "all";
     const list = h("div");
-    const tabs = me && h("div", { cls: "tabs" }, h("a", { href: "#/following", cls: tab === "following" ? "on" : "" }, "Following"), h("a", { href: "#/all", cls: tab === "all" ? "on" : "" }, "Everyone"));
+    const tabs = me && h("div", { cls: "tabs" }, h("a", { href: "#/following", cls: tab === "following" ? "on" : "" }, "Following"), h("a", { href: "#/all", cls: tab === "all" ? "on" : "" }, "Everyone"), h("a", { href: "#/pages" }, "Pages"));
     const top = me ? composer(p => list.prepend(postCard(p))) : h("div", { cls: "card" }, h("h1", { text: "Q India Community" }),
       h("p", { text: "Share posts and photos, follow people, and message friends privately. Free for everyone, always." }),
       h("p", {}, h("a", { cls: "btn", href: "#/signup" }, "Create free account"), " ", h("a", { cls: "sbtn", href: "#/login" }, "Log in")));
@@ -440,7 +473,7 @@
   async function notifsPage() {
     if (!me) return needLogin();
     let d; try { d = await api("/api/s/notifs"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
-    const TXT = { like: "liked your post", comment: "commented on your post", follow: "started following you" };
+    const TXT = { like: "liked your post", comment: "commented on your post", follow: "started following you", share: "shared your post" };
     show(h("h1", { text: "Alerts" }), h("div", { cls: "list" }, d.items.length ? d.items.map(n => h("a", { cls: "li" + (n.read ? "" : " unread"), href: n.post_id ? "#/p/" + n.post_id : "#/u/" + n.user.username },
       avatar(n.user), h("span", { cls: "grow" }, h("b", { text: n.user.name }), " ", TXT[n.kind] || n.kind, h("div", { cls: "last", text: ago(n.created_at) })))) : h("p", { cls: "empty", text: "No alerts yet. When someone likes, comments or follows you, it shows here." })));
     badges();
@@ -563,6 +596,76 @@
       if (r.messages.length && (near || r.messages.some(x => x.mine))) box.scrollTop = box.scrollHeight;
     }
     timer = setInterval(() => { if (!document.hidden) poll(); }, 3000);
+  }
+
+  // ---------- Pages (like Facebook Pages) ----------
+  const pageRow = pg => h("a", { cls: "li", href: "#/pg/" + pg.handle }, avatar(pg), h("span", { cls: "grow" }, h("b", { text: pg.name }), h("div", { cls: "last", text: (pg.category || "Page") + " · " + pg.followers + " follower" + (pg.followers === 1 ? "" : "s") })), pg.closed && h("span", { cls: "tag", text: "Closed" }));
+  async function pagesPage() {
+    if (!me) return needLogin("Please log in to see Pages.");
+    let d; try { d = await api("/api/s/pages"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const q = h("input", { type: "search", placeholder: "Search Pages", autocapitalize: "none" });
+    const disc = h("div", { cls: "list" });
+    const paint = list => disc.replaceChildren(...(list.length ? list.map(pageRow) : [h("p", { cls: "muted", text: "No Pages found." })]));
+    paint(d.discover);
+    let t = null; q.oninput = () => { clearTimeout(t); t = setTimeout(async () => paint((await api("/api/s/pages?q=" + encodeURIComponent(q.value)).catch(() => d)).discover), 300); };
+    show(h("div", { cls: "row", style: "margin:14px 0 4px" }, h("h1", { cls: "grow", style: "margin:0", text: "Pages" }), h("a", { cls: "sbtn main", href: "#/pages/new" }, "＋ Create a Page")),
+      h("p", { cls: "muted", text: "Pages are for a station, a route, a cause, volunteers or an organisation. Follow a Page to see its posts in your Following feed." }),
+      d.mine.length > 0 && h("h2", { text: "My Pages" }), d.mine.length > 0 && h("div", { cls: "list" }, d.mine.map(pageRow)),
+      d.following.length > 0 && h("h2", { text: "Pages I follow" }), d.following.length > 0 && h("div", { cls: "list" }, d.following.map(pageRow)),
+      h("h2", { text: "Discover Pages" }), q, disc);
+  }
+  async function pageForm(handle) {
+    if (!me) return needLogin();
+    let pg = null, cats = [];
+    try { const d = await api("/api/s/pages"); cats = d.categories; if (handle) pg = d.mine.find(x => x.handle === handle); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    if (handle && !pg) return show(h("p", { cls: "empty", text: "Only the Page's owner can change it." }));
+    const m = msgBox(), pics = {};
+    const picBtn = (k, label, max) => photoPicker(async fl => { say(m, "Preparing photo…", true); try { pics[k] = await uploadPhoto(fl, max); say(m, "Photo ready. Tap Save.", true); } catch (e) { say(m, e.message); } }, label);
+    const f = h("form", { cls: "card" }, h("h1", { text: pg ? "Edit Page" : "Create a Page" }),
+      h("div", {}, h("label", { for: "pn", text: "Page name" }), h("input", { id: "pn", name: "name", maxlength: 60, value: pg ? pg.name : "", placeholder: "for example Dadar Queue Volunteers", required: true })),
+      !pg && h("div", {}, h("label", { for: "ph", text: "Page address" }), h("input", { id: "ph", name: "handle", maxlength: 30, autocapitalize: "none", placeholder: "for example dadar_queue", required: true }),
+        h("small", { cls: "muted", text: "3 to 30 small English letters, numbers, _ or . It cannot be changed later." })),
+      h("div", {}, h("label", { for: "pc", text: "Category" }), h("select", { id: "pc", name: "category" }, cats.map(c => h("option", { value: c }, c)))),
+      h("div", {}, h("label", { for: "pa", text: "About (optional)" }), h("textarea", { id: "pa", name: "about", maxlength: 1000, rows: 3 })),
+      h("div", { cls: "row", style: "flex-wrap:wrap" }, picBtn("avatar", "📷 Page photo", 512), picBtn("cover", "🖼 Cover photo", 1600)),
+      h("button", { cls: "btn" }, pg ? "Save" : "Create Page"), m);
+    if (pg) { f.category.value = pg.category; f.about.value = pg.about; } else f.handle.oninput = () => { f.handle.value = f.handle.value.toLowerCase().replace(/[^a-z0-9_.]/g, ""); };
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Please wait…", true);
+      const body = { name: f.name.value, category: f.category.value, about: f.about.value, ...pics };
+      try { if (pg) { await api("/api/s/pages/" + pg.handle, { body }); go("#/pg/" + pg.handle); } else { const r = await api("/api/s/pages", { body: { ...body, handle: f.handle.value } }); go("#/pg/" + r.handle); } }
+      catch (err) { say(m, err.message); }
+    };
+    const parts = [f];
+    if (pg) {
+      const del = h("button", { cls: "sbtn", type: "button" }, "Delete this Page");
+      del.onclick = async () => { if (!confirm("Delete the Page " + pg.name + " and all its posts forever?")) return; try { await api("/api/s/pages/" + pg.handle, { body: { delete: true } }); go("#/pages"); } catch (e) { alertNote(e.message); } };
+      parts.push(h("div", { cls: "card" }, h("label", { text: "Delete Page" }), h("p", { cls: "muted", text: "This removes the Page and all its posts. It cannot be undone." }), del));
+    }
+    show(...parts);
+  }
+  async function pageView(handle) {
+    if (!me) { try { sessionStorage.setItem("qi_after_login", "#/pg/" + handle); } catch {} return needLogin("Please log in or create a free account to see this Page."); }
+    let d; try { d = await api("/api/s/pages/" + encodeURIComponent(handle)); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const pg = d.page, btns = h("div", { cls: "btns" });
+    if (pg.mine) btns.append(h("a", { cls: "sbtn dark", href: `#/pg/${pg.handle}/edit` }, "Edit Page"));
+    else {
+      const fb = h("button", { cls: "sbtn " + (pg.following ? "" : "main") }, pg.following ? "Following ✓" : "Follow");
+      fb.onclick = async () => { try { await api(`/api/s/pages/${pg.handle}/follow`, { body: { follow: !pg.following } }); route(); } catch (e) { alertNote(e.message); } };
+      btns.append(fb);
+      menu(btns, [["Report Page", () => report("page", pg.id)]]);
+    }
+    const link = location.origin + "/community#/pg/" + pg.handle;
+    btns.append(h("button", { cls: "sbtn", type: "button", onclick: () => navigator.share ? navigator.share({ title: pg.name, url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent(pg.name + " on Q India Community: " + link), "_blank") }, "↗ Share"));
+    const head = h("div", { cls: "card prof pg" }, pg.cover ? h("img", { cls: "cover", src: pg.cover, alt: "" }) : h("div", { cls: "cover" }), avatar(pg, "big"),
+      h("h1", { text: pg.name }), h("div", { cls: "muted", text: (pg.category || "Page") + " · @" + pg.handle + " · " + pg.followers + " follower" + (pg.followers === 1 ? "" : "s") }),
+      pg.closed && h("p", { cls: "note", text: "The site owner closed this Page for breaking the rules. Only you can see it." }),
+      pg.about && h("p", { cls: "bio" }, richText(pg.about)), btns);
+    const list = h("div");
+    list.append(...d.posts.map(p => postCard(p)));
+    if (!d.posts.length) list.append(h("p", { cls: "empty", text: pg.mine ? "Write the Page's first post above." : "No posts yet." }));
+    if (d.more) { const b = h("button", { cls: "sbtn loadmore" }, "Show more"); b.onclick = () => { b.remove(); loadMore(list, x => `/api/s/pages/${pg.handle}?before=${x}`, r => r.posts.map(p => postCard(p)), h("span"), Math.min(...d.posts.map(p => p.id))); }; list.append(b); }
+    show(head, pg.mine && !pg.closed && composer(p => { list.querySelector(".empty")?.remove(); list.prepend(postCard(p)); }, pg), list);
   }
 
   // ---------- short videos and voice messages ----------
@@ -929,7 +1032,7 @@
     clearInterval(timer); timer = null; clearTimeout(storyTimer);
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [a, b, c] = parts;
-    const nav = { "": "home", following: "home", all: "home", search: "search", reels: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
+    const nav = { "": "home", following: "home", all: "home", pages: "home", pg: "home", share: "home", search: "search", reels: "reels", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
     document.querySelectorAll("[data-nav]").forEach(x => x.classList.toggle("on", x.dataset.nav === nav));
     window.scrollTo(0, 0);
     switch (a || "") {
@@ -944,6 +1047,9 @@
       case "u": return profilePage(b, c === "followers" || c === "following" ? c : null);
       case "search": return searchPage();
       case "reels": return reelsPage();
+      case "pages": return b === "new" ? pageForm() : pagesPage();
+      case "pg": return c === "edit" ? pageForm(b) : pageView(b);
+      case "share": return sharePage(Number(b));
       case "notifs": return notifsPage();
       case "chats": return chatsPage();
       case "chat": return chatPage(b);
