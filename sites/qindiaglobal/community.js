@@ -1,5 +1,6 @@
 // Q India Community: the page at qindiaglobal.com/community. One page; the part after # picks the screen:
 // #/ feed · #/new · #/p/<id> post · #/u/<username> profile · #/search · #/chats · #/chat/<username> · #/notifs · #/me · #/login · #/signup · #/recover
+// #/status/new · #/status/<username> (Status / Stories) · #/groups · #/g/new · #/g/<id> · #/g/<id>/info · #/join/<code> (group chats)
 (function () {
   "use strict";
   const view = document.getElementById("view");
@@ -23,7 +24,7 @@
     for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : String(k));
     return e;
   }
-  const show = (...nodes) => { view.replaceChildren(...nodes); };
+  const show = (...nodes) => { view.replaceChildren(...nodes.filter(n => n != null && n !== false && n !== "")); };
   async function api(path, opts = {}) {
     const headers = { ...(opts.raw ? { "content-type": "application/octet-stream" } : { "content-type": "application/json" }) };
     if (tok) headers.authorization = "Bearer " + tok;
@@ -37,6 +38,8 @@
     return d;
   }
   function setToken(t) { tok = t; try { t ? localStorage.setItem("qi_s_token", t) : localStorage.removeItem("qi_s_token"); } catch {} }
+  // A page asked for login first (for example a group invite link): go back there afterwards.
+  const afterLogin = dflt => { let x = ""; try { x = sessionStorage.getItem("qi_after_login") || ""; sessionStorage.removeItem("qi_after_login"); } catch {} return x || dflt; };
   const go = hash => { if (location.hash === hash) route(); else location.hash = hash; };
   function ago(ms) {
     const s = (Date.now() - ms) / 1000;
@@ -159,7 +162,7 @@
   }
   async function oauthPage(code) {
     let d; try { d = await api("/api/s/oauth/claim", { body: { code }, noLogout: true }); } catch (e) { loginPage(); return alertNote(e.message); }
-    if (d.token) { setToken(d.token); await loadMe(); return go("#/"); }
+    if (d.token) { setToken(d.token); await loadMe(); return go(afterLogin("#/")); }
     const m = msgBox();
     const f = h("form", { cls: "card" },
       h("h1", { text: "Almost done" }),
@@ -192,7 +195,7 @@
       h("p", { cls: "muted" }, "New here? ", h("a", { href: "#/signup" }, "Create a free account"), " · ", h("a", { href: "#/recover" }, "Forgot password?")));
     f.onsubmit = async e => {
       e.preventDefault(); say(m, "Please wait…", true);
-      try { const d = await api("/api/s/login", { body: { username: f.username.value, password: f.password.value }, noLogout: true }); setToken(d.token); await loadMe(); go("#/"); }
+      try { const d = await api("/api/s/login", { body: { username: f.username.value, password: f.password.value }, noLogout: true }); setToken(d.token); await loadMe(); go(afterLogin("#/")); }
       catch (err) { say(m, err.message); }
     };
     show(f);
@@ -219,7 +222,7 @@
       try {
         const d = await api("/api/s/signup", { body: { name: f.name.value, username: f.username.value, city: f.city.value, password: f.password.value, agree: f.agree.checked, website: f.website.value, ref: savedRef(), ...(await prove()) }, noLogout: true });
         try { localStorage.removeItem("qi_s_ref"); } catch {}
-        setToken(d.token); await loadMe(); showRecovery(d.recovery, () => go("#/me/edit"));
+        setToken(d.token); await loadMe(); showRecovery(d.recovery, () => go(afterLogin("#/me/edit")));
       } catch (err) { say(m, err.message); b.disabled = false; }
     };
     show(f);
@@ -318,7 +321,7 @@
     const top = me ? composer(p => list.prepend(postCard(p))) : h("div", { cls: "card" }, h("h1", { text: "Q India Community" }),
       h("p", { text: "Share posts and photos, follow people, and message friends privately. Free for everyone, always." }),
       h("p", {}, h("a", { cls: "btn", href: "#/signup" }, "Create free account"), " ", h("a", { cls: "sbtn", href: "#/login" }, "Log in")));
-    show(rulesNote(), top, tabs, list);
+    show(rulesNote(), me && storyBar(), top, tabs, list);
     await loadMore(list, b => `/api/s/feed?tab=${tab}&before=${b}`, d => d.posts.map(p => postCard(p)),
       tab === "following" ? h("div", { cls: "empty" }, h("p", { text: "Nothing here yet. Follow people to see their posts, or look at everyone's posts." }), h("a", { cls: "sbtn", href: "#/all" }, "See everyone"), " ", h("a", { cls: "sbtn", href: "#/search" }, "Find people"))
         : h("p", { cls: "empty", text: "No posts yet. Be the first to share something!" }));
@@ -497,7 +500,7 @@
   async function chatsPage() {
     if (!me) return needLogin("Please log in to see your messages.");
     let d; try { d = await api("/api/s/chats"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
-    show(h("h1", { text: "Messages" }),
+    show(h("h1", { text: "Messages" }), chatTabs("chats"),
       h("p", { cls: "muted", text: "Private chats between two people. To start one, open someone's profile and tap Message." }),
       h("div", { cls: "list" }, d.chats.length ? d.chats.map(c => h("a", { cls: "li" + (c.unread ? " unread" : ""), href: "#/chat/" + c.user.username }, avatar(c.user),
         h("span", { cls: "grow" }, h("span", { cls: "row" }, h("b", { cls: "grow", text: c.user.name }), c.request && h("span", { cls: "tag", text: "Request" }), h("small", { cls: "muted", text: ago(c.at) })), h("div", { cls: "last", text: (c.lastMine ? "You: " : "") + c.last })),
@@ -549,6 +552,246 @@
     timer = setInterval(() => { if (!document.hidden) poll(); }, 3000);
   }
 
+  // ---------- Status / Stories (disappear after 24 hours) ----------
+  const BG = ["#1d3557", "#e85d04", "#2a9d8f", "#6a4c93", "#c1121f", "#264653"];
+  let storyTimer = null;
+  function storyBar() {
+    const bar = h("div", { cls: "stories", "aria-label": "Status updates" });
+    api("/api/s/stories").then(d => {
+      const mineP = d.people.find(p => p.me);
+      const st = (href, ringCls, face, label) => h("a", { cls: "st", href }, h("span", { cls: "ring " + ringCls }, face), h("small", { text: label }));
+      bar.append(st(mineP ? "#/status/" + me.username : "#/status/new", mineP ? "seen" : "add", avatar(me), "My status"));
+      if (mineP) bar.append(st("#/status/new", "add", h("span", { cls: "av plus", "aria-hidden": "true", text: "＋" }), "Add"));
+      d.people.filter(p => !p.me).forEach(p => bar.append(st("#/status/" + p.user.username, p.unseen ? "" : "seen", avatar(p.user), [...p.user.name].slice(0, 10).join(""))));
+    }).catch(() => bar.remove());
+    return bar;
+  }
+  async function storyPage(username) {
+    if (!me) return needLogin("Please log in to see status updates.");
+    let d; try { d = await api("/api/s/stories"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const order = d.people;
+    let pi = order.findIndex(p => p.user.username === username);
+    if (pi < 0) { go("#/"); return setTimeout(() => alertNote("This status is no longer available."), 300); }
+    let si = Math.max(0, order[pi].stories.findIndex(s => !s.seen));
+    if (order[pi].me) si = 0;
+    const bars = h("div", { cls: "sv-bars" }), body = h("div", { cls: "sv-body" }), head = h("div", { cls: "sv-head" }), foot = h("div", { cls: "sv-foot" });
+    const box = h("div", { cls: "sv", role: "dialog", "aria-label": "Status" }, bars, head, body, foot);
+    let paused = false, left = 0, startAt = 0, fill = null;
+    const close = () => { clearTimeout(storyTimer); go("#/"); };
+    function next() { const p = order[pi]; if (si < p.stories.length - 1) si++; else if (pi < order.length - 1) { pi++; si = 0; } else return close(); draw(); }
+    function prev() { if (si > 0) si--; else if (pi > 0) { pi--; si = 0; } draw(); }
+    function run(ms) { clearTimeout(storyTimer); left = ms; startAt = Date.now(); storyTimer = setTimeout(next, ms); if (fill) { fill.style.transition = "none"; fill.style.width = (100 * (1 - ms / 5500)) + "%"; requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.transition = "width " + ms + "ms linear"; fill.style.width = "100%"; })); } }
+    function pause() { if (paused) return; paused = true; clearTimeout(storyTimer); left -= Date.now() - startAt; if (fill) { fill.style.width = getComputedStyle(fill).width; fill.style.transition = "none"; } }
+    function resume() { if (!paused) return; paused = false; run(Math.max(300, left)); }
+    function draw() {
+      const p = order[pi], s = p.stories[si];
+      bars.replaceChildren(...p.stories.map((x, i) => h("span", {}, h("i", { style: "width:" + (i < si ? 100 : 0) + "%" }))));
+      fill = bars.children[si].firstChild;
+      head.replaceChildren(h("a", { cls: "row who grow", href: "#/u/" + p.user.username }, avatar(p.user, "sm"), h("span", { cls: "grow" }, h("b", { text: p.me ? "My status" : p.user.name }), h("small", { text: ago(s.at) }))),
+        menu(null, [p.me ? ["Delete this status", async () => { if (!confirm("Delete this status?")) return; try { await api(`/api/s/stories/${s.id}/delete`, { body: {} }); p.stories.splice(si, 1); if (!p.stories.length) return close(); si = Math.min(si, p.stories.length - 1); draw(); } catch (e) { alertNote(e.message); } }]
+          : ["Report this status", () => { pause(); report("story", s.id); }]]),
+        h("button", { cls: "sv-x", type: "button", "aria-label": "Close", onclick: close }, "✕"));
+      body.replaceChildren();
+      body.style.background = s.photo ? "#000" : BG[s.bg] || BG[0];
+      if (s.photo) body.append(h("img", { src: s.photo, alt: s.text || "Status photo" }), s.text && h("p", { cls: "sv-cap", text: s.text }));
+      else body.append(h("p", { cls: "sv-text" }, richText(s.text)));
+      foot.replaceChildren();
+      if (p.me) {
+        const vb = h("button", { type: "button", cls: "sbtn" }, s.status === "pending" ? "Waiting for a check; only you can see it" : "👁 " + (s.views || 0) + " view" + (s.views === 1 ? "" : "s"));
+        vb.onclick = async () => {
+          pause();
+          const r = await api(`/api/s/stories/${s.id}/viewers`).catch(() => ({ viewers: [] }));
+          foot.replaceChildren(h("div", { cls: "sv-viewers" }, h("b", { text: "Viewed by" }), r.viewers.length ? r.viewers.map(v => h("div", { cls: "row" }, avatar(v, "sm"), h("span", { cls: "grow", text: v.name }), h("small", { text: ago(v.at) }))) : h("p", { text: "No views yet." }),
+            h("button", { type: "button", cls: "sbtn", onclick: () => { draw(); } }, "Close")));
+        };
+        foot.append(vb);
+      } else {
+        const inp = h("input", { placeholder: "Reply to " + p.user.name + "…", maxlength: 1500, "aria-label": "Reply" });
+        const f = h("form", { cls: "row" }, inp, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
+        inp.onfocus = pause;
+        f.onsubmit = async e => {
+          e.preventDefault(); const t = inp.value.trim(); if (!t) return;
+          try { await api("/api/s/chats/" + encodeURIComponent(p.user.username), { body: { text: "↩ Reply to your status" + (s.text ? " “" + [...s.text].slice(0, 80).join("") + "”" : "") + ":\n" + t } }); inp.value = ""; inp.blur(); alertNote("Reply sent privately."); resume(); }
+          catch (er) { alertNote(er.message); }
+        };
+        foot.append(f);
+        if (!s.seen) { s.seen = true; api(`/api/s/stories/${s.id}/view`, { body: {} }).catch(() => {}); }
+      }
+      paused = false; run(s.photo ? 6000 : 5500);
+    }
+    body.onclick = e => { if (paused) return resume(); (e.clientX - box.getBoundingClientRect().left < box.clientWidth / 3 ? prev : next)(); };
+    body.onpointerdown = () => { body._t = setTimeout(pause, 250); };
+    body.onpointerup = () => { clearTimeout(body._t); };
+    show(box); draw();
+  }
+  function storyComposer() {
+    if (!me) return needLogin();
+    const m = msgBox(); let photo = null, file = null, bg = 0;
+    const ta = h("textarea", { name: "text", maxlength: 700, placeholder: "Type a status…", "aria-label": "Status text" });
+    const stage = h("div", { cls: "st-stage" }, ta);
+    const paint = () => { stage.style.background = file ? "#000" : BG[bg]; ta.placeholder = file ? "Add a caption…" : "Type a status…"; stage.classList.toggle("photo", !!file); };
+    const colour = h("button", { type: "button", cls: "sbtn", onclick: () => { bg = (bg + 1) % BG.length; paint(); } }, "🎨 Colour");
+    const pick = photoPicker(fl => { file = fl; photo = null; stage.querySelector("img")?.remove(); stage.prepend(h("img", { src: URL.createObjectURL(fl), alt: "" })); colour.hidden = true; paint(); });
+    const f = h("form", { cls: "card" }, h("h1", { text: "New status" }),
+      h("p", { cls: "muted", text: "Your followers see it at the top of their feed for 24 hours, then it disappears." }),
+      stage, h("div", { cls: "row" }, pick, colour), h("button", { cls: "btn" }, "Share status"), m);
+    f.onsubmit = async e => {
+      e.preventDefault();
+      if (!ta.value.trim() && !file) return say(m, "Type something or choose a photo.");
+      say(m, "Please wait…", true);
+      try {
+        if (file && !photo) photo = await uploadPhoto(file);
+        const r = await api("/api/s/stories", { body: { text: ta.value, photo, bg } });
+        go("#/"); if (r.status === "pending") setTimeout(() => alertNote("Your photo status will appear after a quick check by the site owner."), 300);
+      } catch (err) { say(m, err.message); }
+    };
+    paint(); show(f); ta.focus();
+  }
+
+  // ---------- group chats ----------
+  const chatTabs = on => h("div", { cls: "tabs" }, h("a", { href: "#/chats", cls: on === "chats" ? "on" : "" }, "Chats"), h("a", { href: "#/groups", cls: on === "groups" ? "on" : "" }, "Groups"));
+  async function groupsPage() {
+    if (!me) return needLogin("Please log in to see your groups.");
+    let d; try { d = await api("/api/s/groups"); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    show(h("h1", { text: "Messages" }), chatTabs("groups"),
+      h("p", {}, h("a", { cls: "sbtn main", href: "#/g/new" }, "＋ New group")),
+      h("div", { cls: "list" }, d.groups.length ? d.groups.map(g => h("a", { cls: "li" + (g.unread ? " unread" : ""), href: "#/g/" + g.id }, avatar(g),
+        h("span", { cls: "grow" }, h("span", { cls: "row" }, h("b", { cls: "grow", text: g.name }), g.closed && h("span", { cls: "tag", text: "Closed" }), h("small", { cls: "muted", text: ago(g.at) })), h("div", { cls: "last", text: g.last })),
+        g.unread && h("span", { cls: "dot" }))) : h("div", { cls: "empty" }, h("p", { text: "No groups yet. Make one for your station, your train or your friends." }))));
+  }
+  // Pick people who follow me (only they can be added to a group).
+  async function followerPicker(skip = new Set()) {
+    const r = await api(`/api/s/users/${encodeURIComponent(me.username)}/followers`).catch(() => ({ users: [] }));
+    const users = r.users.filter(u => !skip.has(u.username));
+    const q = h("input", { type: "search", placeholder: "Search your followers", autocapitalize: "none" });
+    const list = h("div", { cls: "pick" }, users.length ? users.map(u => h("label", { cls: "tick row" }, h("input", { type: "checkbox", value: u.username }), avatar(u, "sm"), h("span", { cls: "grow" }, h("b", { text: u.name }), " ", h("small", { cls: "muted", text: "@" + u.username }))))
+      : h("p", { cls: "muted", text: skip.size ? "All your followers are already in this group." : "Nobody follows you yet. You can make the group and share its invite link." }));
+    q.oninput = () => { const s = q.value.toLowerCase(); list.querySelectorAll("label").forEach(l => { l.hidden = !l.textContent.toLowerCase().includes(s); }); };
+    return { node: h("div", {}, users.length > 8 && q, list), chosen: () => [...list.querySelectorAll("input:checked")].map(i => i.value) };
+  }
+  async function newGroupPage() {
+    if (!me) return needLogin();
+    const m = msgBox(); let photo;
+    const pic = h("div", { cls: "row" }, avatar({ name: "＋" }, "big"));
+    const pick = await followerPicker();
+    const f = h("form", { cls: "card" }, h("h1", { text: "New group" }),
+      h("div", { cls: "row" }, pic, photoPicker(async fl => { say(m, "Preparing photo…", true); try { photo = await uploadPhoto(fl, 512); pic.replaceChildren(h("img", { cls: "av big", src: URL.createObjectURL(fl), alt: "" })); say(m, "", true); } catch (e) { say(m, e.message); } }, "📷 Group photo")),
+      h("div", {}, h("label", { for: "gn", text: "Group name" }), h("input", { id: "gn", name: "name", maxlength: 60, placeholder: "for example Dadar 8:15 local", required: true })),
+      h("div", {}, h("label", { for: "ga", text: "About (optional)" }), h("textarea", { id: "ga", name: "about", maxlength: 500, rows: 2 })),
+      h("div", {}, h("label", { text: "Add people" }), h("p", { cls: "muted", text: "You can add people who follow you. Anyone else can join with the group's invite link." }), pick.node),
+      h("button", { cls: "btn" }, "Create group"), m);
+    f.onsubmit = async e => {
+      e.preventDefault(); say(m, "Please wait…", true);
+      try { const r = await api("/api/s/groups", { body: { name: f.name.value, about: f.about.value, avatar: photo, members: pick.chosen() } }); go("#/g/" + r.id); }
+      catch (err) { say(m, err.message); }
+    };
+    show(f);
+  }
+  async function groupPage(id) {
+    if (!me) return needLogin("Please log in to see your groups.");
+    let d; try { d = await api("/api/s/groups/" + id); } catch (e) { return show(h("p", { cls: "empty" }, e.message, h("br"), h("a", { cls: "sbtn", href: "#/groups" }, "My groups"))); }
+    const g = d.group, box = h("div", { cls: "msgs" });
+    let lastId = 0, lastDay = "";
+    const add = x => {
+      const day = new Date(x.at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      if (day !== lastDay) { box.append(h("div", { cls: "day", text: day })); lastDay = day; }
+      lastId = Math.max(lastId, x.id);
+      if (x.info) return box.append(h("div", { cls: "day info", text: x.text }));
+      const b = h("div", { cls: "bubble" + (x.mine ? " me" : "") }, !x.mine && x.user && h("a", { cls: "from", href: "#/u/" + x.user.username, text: x.user.name }),
+        x.photo && h("img", { src: x.photo, alt: "Photo", loading: "lazy" }), x.text, h("small", { text: clock(x.at) }));
+      const opts = [(x.mine || g.admin) && ["Delete for everyone", async () => { try { await api(`/api/s/group-messages/${x.id}/delete`, { body: {} }); b.remove(); } catch (er) { alertNote(er.message); } }],
+        !x.mine && ["Report message", () => report("groupmsg", x.id)]].filter(Boolean);
+      let press = null;
+      b.oncontextmenu = e => e.preventDefault();
+      const open = () => { const mm = menu(null, opts); b.append(mm); mm.querySelector("button").click(); };
+      b.onpointerdown = () => { press = setTimeout(open, 600); };
+      b.onpointerup = b.onpointerleave = () => clearTimeout(press);
+      b.ondblclick = open;
+      box.append(b);
+    };
+    d.messages.forEach(add); badges();
+    const m = msgBox(), notes = h("div");
+    const setCannot = why => notes.replaceChildren(...(why ? [h("p", { cls: "note", text: why })] : []));
+    setCannot(d.cannot);
+    const ta = h("textarea", { name: "text", rows: 1, maxlength: 2000, placeholder: "Message", "aria-label": "Message" });
+    let sending = false;
+    const send = async (text, photo) => {
+      if (sending) return; sending = true;
+      try { await api(`/api/s/groups/${id}/messages`, { body: { text, photo } }); say(m, "", true); await poll(); }
+      catch (e) { say(m, e.message); } finally { sending = false; }
+    };
+    const f = h("form", {}, photoPicker(async fl => { say(m, "Sending photo…", true); try { const pid = await uploadPhoto(fl); await send("", pid); } catch (e) { say(m, e.message); } }, "📷"), ta, h("button", { cls: "btn", "aria-label": "Send" }, "➤"));
+    f.onsubmit = e => { e.preventDefault(); const t = ta.value.trim(); if (!t) return; ta.value = ""; send(t); };
+    ta.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && matchMedia("(pointer:fine)").matches) { e.preventDefault(); f.requestSubmit(); } };
+    const head = h("div", { cls: "head" }, h("a", { href: "#/groups", cls: "sbtn", "aria-label": "Back" }, "←"),
+      h("a", { cls: "row who grow", href: `#/g/${id}/info` }, avatar(g), h("span", { cls: "grow" }, h("b", { text: g.name }), h("small", { text: g.members + " members · tap for group info" }))));
+    show(h("div", { cls: "chat" }, head, notes, box, f, m), h("p", { cls: "muted", text: "Group messages are kept on the Qindia server. All members can see them. The site owner sees a message only if a member reports it. Never share passwords, OTPs or bank details." }));
+    box.scrollTop = box.scrollHeight;
+    async function poll() {
+      const r = await api(`/api/s/groups/${id}?after=${lastId}`).catch(() => null);
+      if (!r || !view.contains(box)) return;
+      const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      r.messages.forEach(add); setCannot(r.cannot); g.admin = r.group.admin;
+      if (r.messages.length && (near || r.messages.some(x => x.mine))) box.scrollTop = box.scrollHeight;
+    }
+    timer = setInterval(() => { if (!document.hidden) poll(); }, 3000);
+  }
+  async function groupInfoPage(id) {
+    if (!me) return needLogin();
+    let d; try { d = await api("/api/s/groups/" + id); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const g = d.group, act = async (path, body, msg) => { try { await api(path, { body }); if (msg) alertNote(msg); groupInfoPage(id); } catch (e) { alertNote(e.message); } };
+    const parts = [h("p", {}, h("a", { cls: "sbtn", href: "#/g/" + id }, "← Back to chat")),
+      h("div", { cls: "card prof" }, avatar(g, "big"), h("h1", { text: g.name }), h("div", { cls: "muted", text: "Group · " + g.members + " members" }), g.about && h("p", { cls: "bio" }, richText(g.about)))];
+    if (g.invite) {
+      const link = location.origin + "/community#/join/" + g.invite;
+      parts.push(h("div", { cls: "card" }, h("label", { text: "Invite link" }), h("p", { cls: "muted", text: "Anyone with this link can join the group. Share it on WhatsApp or anywhere." }),
+        h("p", { cls: "code", style: "font-size:14px", text: link }),
+        h("div", { cls: "row", style: "flex-wrap:wrap" },
+          h("button", { cls: "sbtn main", type: "button", onclick: () => navigator.share ? navigator.share({ title: "Join " + g.name + " on Q India Community", url: link }).catch(() => {}) : window.open("https://wa.me/?text=" + encodeURIComponent("Join my group " + g.name + " on Q India Community: " + link), "_blank") }, "Share link"),
+          h("button", { cls: "sbtn", type: "button", onclick: () => navigator.clipboard && navigator.clipboard.writeText(link).then(() => alertNote("Link copied.")) }, "Copy"),
+          g.admin && h("button", { cls: "sbtn", type: "button", onclick: () => confirm("Make a new link? The old link will stop working.") && act("/api/s/groups/" + id, { invite: "reset" }, "New link made.") }, "New link"),
+          g.admin && h("button", { cls: "sbtn", type: "button", onclick: () => act("/api/s/groups/" + id, { invite: "off" }, "Invite link switched off.") }, "Switch off"))));
+    } else if (g.admin) parts.push(h("div", { cls: "card" }, h("label", { text: "Invite link" }), h("p", { cls: "muted", text: "The invite link is off." }), h("button", { cls: "sbtn main", type: "button", onclick: () => act("/api/s/groups/" + id, { invite: "reset" }) }, "Switch on")));
+    if (g.admin) {
+      const m = msgBox(); let photo;
+      const ef = h("form", { cls: "card" }, h("label", { text: "Edit group (admins)" }),
+        h("input", { name: "name", maxlength: 60, value: g.name, required: true, "aria-label": "Group name" }),
+        h("textarea", { name: "about", maxlength: 500, rows: 2, placeholder: "About the group", "aria-label": "About" }),
+        h("div", { cls: "row" }, photoPicker(async fl => { say(m, "Preparing photo…", true); try { photo = await uploadPhoto(fl, 512); say(m, "Tap Save to keep this photo.", true); } catch (e) { say(m, e.message); } }, "📷 Group photo")),
+        h("label", { cls: "tick" }, h("input", { type: "checkbox", name: "only" }), h("span", { text: "Only admins can send messages" })),
+        h("button", { cls: "sbtn dark" }, "Save"), m);
+      ef.about.value = g.about; ef.only.checked = g.onlyAdmins;
+      ef.onsubmit = async e => { e.preventDefault(); const body = { name: ef.name.value, about: ef.about.value, onlyAdmins: ef.only.checked }; if (photo) body.avatar = photo; act("/api/s/groups/" + id, body, "Saved."); };
+      const pick = await followerPicker(new Set(d.people.map(p => p.username)));
+      const am = msgBox();
+      const af = h("form", { cls: "card" }, h("label", { text: "Add people" }), pick.node, h("button", { cls: "sbtn main" }, "Add to group"), am);
+      af.onsubmit = async e => { e.preventDefault(); const add = pick.chosen(); if (!add.length) return say(am, "Tick the people to add."); act(`/api/s/groups/${id}/members`, { add }, "Added."); };
+      parts.push(ef, af);
+    }
+    parts.push(h("h2", { text: g.members + " members" }), h("div", { cls: "list" }, d.people.map(p => {
+      const row = h("div", { cls: "li" }, h("a", { cls: "row who grow", href: "#/u/" + p.username }, avatar(p), h("span", { cls: "grow" }, h("b", { text: p.me ? "You" : p.name }), h("div", { cls: "last", text: "@" + p.username }))), p.admin && h("span", { cls: "tag", text: "Admin" }));
+      if (g.admin && !p.me) menu(row, [
+        p.admin ? ["Remove as admin", () => act(`/api/s/groups/${id}/members/${p.username}`, { action: "member" })] : ["Make group admin", () => act(`/api/s/groups/${id}/members/${p.username}`, { action: "admin" })],
+        ["Remove from group", () => confirm("Remove " + p.name + " from the group?") && act(`/api/s/groups/${id}/members/${p.username}`, { action: "remove" })],
+      ]);
+      return row;
+    })));
+    const leave = h("button", { cls: "sbtn", type: "button" }, "Leave group");
+    leave.onclick = async () => { if (!confirm("Leave " + g.name + "?")) return; try { await api(`/api/s/groups/${id}/leave`, { body: {} }); go("#/groups"); } catch (e) { alertNote(e.message); } };
+    parts.push(h("div", { cls: "card row", style: "flex-wrap:wrap" }, leave, h("button", { cls: "sbtn", type: "button", onclick: () => report("group", g.id) }, "Report group")));
+    show(...parts);
+  }
+  async function joinPage(code) {
+    if (!me) { try { sessionStorage.setItem("qi_after_login", "#/join/" + code); } catch {} return needLogin("Please log in or create a free account to join this group."); }
+    let d; try { d = await api("/api/s/join/" + encodeURIComponent(code)); } catch (e) { return show(h("p", { cls: "empty", text: e.message })); }
+    const g = d.group;
+    if (g.member) return go("#/g/" + g.id);
+    const m = msgBox(), b = h("button", { cls: "btn" }, "Join group");
+    b.onclick = async () => { b.disabled = true; try { const r = await api("/api/s/join/" + encodeURIComponent(code), { body: {} }); go("#/g/" + r.id); } catch (e) { say(m, e.message); b.disabled = false; } };
+    show(h("div", { cls: "card prof" }, avatar(g, "big"), h("h1", { text: g.name }), h("div", { cls: "muted", text: "Group · " + g.members + " members" }), g.about && h("p", { cls: "bio" }, richText(g.about)),
+      h("p", { cls: "muted", text: "You were invited to this group. Members will see your name and messages." }), b, m));
+  }
+
   // ---------- badges (unread messages and alerts) ----------
   async function loadMe() {
     if (!tok) { me = null; return; }
@@ -564,10 +807,10 @@
 
   // ---------- screens ----------
   async function route() {
-    clearInterval(timer); timer = null;
+    clearInterval(timer); timer = null; clearTimeout(storyTimer);
     const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
     const [a, b, c] = parts;
-    const nav = { "": "home", following: "home", all: "home", search: "search", new: "new", chats: "chats", chat: "chats", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
+    const nav = { "": "home", following: "home", all: "home", search: "search", new: "new", chats: "chats", chat: "chats", groups: "chats", g: "chats", join: "chats", status: "home", notifs: "notifs", me: "me", login: "me", signup: "me", recover: "me" }[a || ""] || (a === "u" && me && b === me.username ? "me" : "");
     document.querySelectorAll("[data-nav]").forEach(x => x.classList.toggle("on", x.dataset.nav === nav));
     window.scrollTo(0, 0);
     switch (a || "") {
@@ -584,6 +827,10 @@
       case "notifs": return notifsPage();
       case "chats": return chatsPage();
       case "chat": return chatPage(b);
+      case "groups": return groupsPage();
+      case "g": return b === "new" ? newGroupPage() : c === "info" ? groupInfoPage(Number(b)) : groupPage(Number(b));
+      case "join": return joinPage(b);
+      case "status": return b === "new" ? storyComposer() : storyPage(b);
       case "me": return !me ? needLogin() : b === "edit" ? editPage() : b === "settings" ? settingsPage() : go("#/u/" + me.username);
       default: return feedPage();
     }

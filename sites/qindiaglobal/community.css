@@ -92,3 +92,49 @@ body.cm{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .social-google b{background:#4285f4}.social-facebook b{background:#1877f2}
 .social .or{text-align:center;color:var(--muted);font-size:13px;margin:4px 0}
 .social:empty{display:none}
+/* Status / Stories */
+.stories{display:flex;gap:12px;overflow-x:auto;padding:8px 2px 6px;margin:6px 0;scrollbar-width:none}
+.stories::-webkit-scrollbar{display:none}
+.st{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--ink)}
+.st small{font-size:12px;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st .ring{padding:3px;border-radius:50%;background:conic-gradient(var(--accent),#f4a261,#2a9d8f,var(--accent))}
+.st .ring.seen{background:var(--line)}
+.st .ring.add{background:none;border:2px dashed var(--line);padding:1px}
+.st .ring .av{width:56px;height:56px;border:2px solid #fff;font-size:22px}
+.st .av.plus{background:var(--bg);color:var(--accent);font-size:28px}
+.sv{position:fixed;inset:0;z-index:20;background:#000;color:#fff;display:flex;flex-direction:column;max-width:640px;margin:0 auto}
+.sv-bars{display:flex;gap:4px;padding:10px 10px 0;padding-top:calc(10px + env(safe-area-inset-top))}
+.sv-bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
+.sv-bars i{display:block;height:100%;background:#fff;width:0}
+.sv-head{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.sv-head .who,.sv-head .who small{color:#fff}
+.sv-head .dots{color:#fff}
+.sv-head .more-menu{color:var(--ink)}
+.sv-x{font:inherit;font-size:22px;background:none;border:0;color:#fff;cursor:pointer;padding:4px 8px}
+.sv-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;cursor:pointer}
+.sv-body img{max-width:100%;max-height:100%;object-fit:contain;-webkit-touch-callout:none;pointer-events:none}
+.sv-text{font-size:clamp(22px,6vw,32px);font-weight:700;text-align:center;padding:20px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.35}
+.sv-text a{color:#fff}
+.sv-cap{position:absolute;left:0;right:0;bottom:0;margin:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,.7));font-size:16px;text-align:center;white-space:pre-wrap}
+.sv-foot{padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.sv-foot .sbtn{width:100%}
+.sv-foot form{display:flex;gap:8px}
+.sv-foot input{flex:1;margin:0;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.4)}
+.sv-foot input::placeholder{color:rgba(255,255,255,.75)}
+.sv-foot .btn{flex:none;padding:10px 18px}
+.sv-viewers{background:#fff;color:var(--ink);border-radius:16px;padding:12px;max-height:45vh;overflow-y:auto}
+.sv-viewers .row{padding:6px 0}
+.st-stage{position:relative;border-radius:16px;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:12px}
+.st-stage textarea{background:transparent;border:0;color:#fff;font-size:24px;font-weight:700;text-align:center;min-height:120px;resize:none;margin:0}
+.st-stage textarea::placeholder{color:rgba(255,255,255,.7)}
+.st-stage.photo textarea{font-size:16px;font-weight:400;min-height:48px;background:rgba(0,0,0,.4);border-radius:10px}
+.st-stage img{max-width:100%;max-height:340px;border-radius:10px;margin-bottom:8px}
+/* Group chats */
+.bubble .from{display:block;font-size:13px;font-weight:700;color:var(--accent);text-decoration:none;margin-bottom:2px}
+.day.info{background:#fff8e1;max-width:90%;text-align:center}
+.pick{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:4px 10px;background:#fff}
+.pick label.tick{align-items:center;padding:6px 0;margin:0;gap:8px}
+.pick label.tick input{margin:0}
+.list div.li{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:14px;margin:8px 0}
+.cm h2{font-size:18px;margin:16px 0 6px;color:var(--deep)}
+.code{overflow-wrap:anywhere}
